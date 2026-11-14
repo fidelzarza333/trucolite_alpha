@@ -1,0 +1,11 @@
+{
+  "name": "trucolite",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "sim": "node tools/simulate.mjs",
+    "serve": "node tools/serve.mjs"
+  }
+}

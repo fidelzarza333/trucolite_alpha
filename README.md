@@ -1,2 +1,22 @@
-# trucolite_alpha
-💣🃏 Trucolite: un roguelite de cartas donde el Truco argentino es la mecánica, no solo la temática. Armá tu mazo, sumá comodines y cantá Envido, Truco, Retruco y Vale 4 para avanzar ronda tras ronda. Hecho con cariño por Crazy Bomb Studios. Jugamos con nuestras reglas.
+# Trucolite · Fase 2 (prototipo)
+
+Juego de cartas de un jugador contra El Rival. La run incorpora niveles de meta creciente, dinero, una tienda y un sistema de mejoras/comodines. El núcleo sigue siendo JavaScript puro y reproducible por seed.
+
+## Requisitos
+
+- Node.js 20 o posterior.
+- No requiere dependencias externas.
+
+## Cómo abrir
+
+Desde la carpeta del proyecto, hacé doble clic en:
+
+👉 **`iniciar_juego.bat`**
+
+Esto hará:
+1. Abrirá una ventana de consola (Terminal).
+2. Iniciará el servidor local en `http://localhost:8080`.
+3. Abrirá automáticamente tu navegador en esa dirección.
+4. ¡Listo! Ya estás jugando.
+
+> Cuando termines de jugar, cerrá la ventana negra de la consola o presioná `Ctrl + C`.
