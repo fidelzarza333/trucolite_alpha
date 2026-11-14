@@ -1,4 +1,4 @@
-# Trucolite · Fase 2 (prototipo)
+# Trucolite ALPHA
 
 Juego de cartas de un jugador contra El Rival. La run incorpora niveles de meta creciente, dinero, una tienda y un sistema de mejoras/comodines. El núcleo sigue siendo JavaScript puro y reproducible por seed.
 
