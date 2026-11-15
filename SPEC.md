@@ -37,21 +37,24 @@
 ## Acciones
 
 - `{ type: "PLAY_CARD", id }`: juega una carta propia; El Rival responde automáticamente o deja su carta visible si lideraba.
-- `{ type: "DISCARD", ids }`: cambia de una a tres cartas en una acción antes de la primera carta del jugador. Las cartas descartadas vuelven al fondo del mazo después de robar.
-- `{ type: "CANTAR", canto }`: `envido`, `flor`, `truco`, `retruco` o `valeCuatro`. Los cantos de Envido/Flor se resuelven al instante; El Rival responde al Truco.
+- `{ type: "DISCARD", ids }`: descarta de una a tres cartas en una acción antes de la primera carta del jugador. Las cartas descartadas vuelven al fondo del mazo después de robar.
+- `{ type: "CANTAR", canto }`: `envido`, `flor`, `truco`, `retruco` o `valeCuatro`. Los cantos de Envido/Flor se resuelven al instante y otorgan +$1 al ganar (-$1 al perder); El Rival responde al Truco.
 - `{ type: "ANSWER_CANTO", wants }`: responde `true` (quiero) o `false` (no quiero) a un canto de Truco iniciado por El Rival.
 - `{ type: "NEXT_ROUND" }`: válido solo en `roundEnded`; alterna el mano y reparte la siguiente ronda.
 - `{ type: "BUY_ITEM", itemId, cardId? }`: compra solo una oferta presente y aprobada; `cardId` es obligatorio para mejoras de carta.
 - `{ type: "SELL_JOKER", itemId }`: vende un comodín propio por la mitad de su precio de catálogo.
+- `{ type: "MOVE_JOKER", fromIndex, toIndex }`: intercambia la posición de dos comodines del inventario para ordenar sinergias.
 - `{ type: "NEXT_LEVEL" }`: válido solo en `shop`; aumenta la meta, conserva recursos de run y reparte la primera ronda del nivel siguiente.
 
-Acción inválida: devuelve el mismo estado y un evento `ERROR` con código. Códigos: `WRONG_PHASE`, `CARD_NOT_IN_HAND`, `DISCARD_WINDOW_CLOSED`, `NO_DISCARDS_LEFT`, `CANTO_NOT_AVAILABLE`, `CANTO_ORDER`, `ITEM_NOT_AVAILABLE`, `ITEM_NOT_APPROVED`, `INSUFFICIENT_MONEY`, `CARD_NOT_IN_DECK`, `JOKER_LIMIT_REACHED`, `JOKER_NOT_OWNED`, `UNKNOWN_ACTION`. Una configuración inválida de `createGame` devuelve `state: null` y `INVALID_GAME_CONFIGURATION`.
+Acción inválida: devuelve el mismo estado y un evento `ERROR` con código. Códigos: `WRONG_PHASE`, `CARD_NOT_IN_HAND`, `DISCARD_WINDOW_CLOSED`, `NO_DISCARDS_LEFT`, `CANTO_NOT_AVAILABLE`, `CANTO_ORDER`, `ITEM_NOT_AVAILABLE`, `ITEM_NOT_APPROVED`, `INSUFFICIENT_MONEY`, `CARD_NOT_IN_DECK`, `JOKER_LIMIT_REACHED`, `JOKER_NOT_OWNED`, `INVALID_JOKER_INDEX`, `UNKNOWN_ACTION`. Una configuración inválida de `createGame` devuelve `state: null` y `INVALID_GAME_CONFIGURATION`.
 
 ## Puntuación y objetos
 
-- Se conserva la fórmula de Fase 1: `chips × mult × xmult`.
+- Se conserva la fórmula: `chips × mult × xmult`.
+- Perder rondas o cantos no resta puntos del puntaje acumulado.
 - Las mejoras de carta activan sus efectos cuando se juega la carta marcada.
-- Los comodines responden a cartas jugadas por palo/rango, a cantos de Truco ganados por el jugador o a cantos de Truco del Rival aceptados que terminan en victoria del jugador.
+- Los comodines responden a cartas jugadas por palo/rango, descartes, dinero acumulado, cartas retenidas en mano y posición en el inventario.
+- Los comodines con trigger por carta jugada (`CARD_SUIT_PLAYED`, `CARD_RANK_PLAYED`, etc.) se activan por cada carta jugada que coincida en la ronda.
 - Los efectos de dinero se suman al resolver la ronda en la que disparan.
 - Los objetos oficiales, rarezas, precios y efectos se describen en `ITEMS.md`.
 

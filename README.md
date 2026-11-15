@@ -17,7 +17,6 @@ Esto hará:
 1. Abrirá una ventana de consola (Terminal).
 2. Iniciará el servidor local en `http://localhost:8080`.
 3. Abrirá automáticamente tu navegador en esa dirección.
-4. Usa pantalla completa (F11) o si no se puede ver un poco cortado
-5. ¡Listo! Ya estás jugando.
+4. ¡Listo! Ya estás jugando.
 
 > Cuando termines de jugar, cerrá la ventana negra de la consola o presioná `Ctrl + C`.

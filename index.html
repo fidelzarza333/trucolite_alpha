@@ -465,11 +465,12 @@
     .app-container {
       display: flex;
       flex-direction: column;
-      height: calc(100vh - 16px);
+      height: 100vh;
+      max-height: 100vh;
       max-width: 1600px;
       margin: 0 auto;
-      padding: 8px;
-      gap: 8px;
+      padding: 6px;
+      gap: 6px;
       overflow: hidden;
       transform-style: preserve-3d;
       will-change: transform;
@@ -484,18 +485,18 @@
       background: var(--panel);
       border: 3px solid var(--border);
       border-radius: 10px;
-      padding: 10px;
+      padding: 6px 8px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      gap: 10px;
+      gap: 4px;
       box-shadow: var(--shadow-soft);
       overflow-y: auto;
-      max-height: calc(100vh - 32px);
+      max-height: calc(100vh - 12px);
       shrink: 0;
     }
     @media (min-width: 1024px) {
-      .sidebar { width: 310px; height: 100%; overflow: hidden; }
+      .sidebar { width: 275px; height: 100%; overflow-y: auto; }
     }
 
     /* Balatro Title Header */
@@ -753,10 +754,10 @@
       justify-content: space-between;
       border: 3px solid var(--border);
       border-radius: 10px;
-      padding: 10px;
+      padding: 6px 10px;
       position: relative;
       overflow: hidden;
-      gap: 8px;
+      gap: 4px;
     }
 
     /* TOP SECTION: 5 JOKER SLOTS */
@@ -786,9 +787,9 @@
       background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
       border: 2px solid var(--border);
       border-radius: 8px;
-      padding: 6px;
-      width: clamp(74px, 10vw, 98px);
-      aspect-ratio: 0.66;
+      padding: 4px;
+      width: clamp(62px, 7.5vw, 82px);
+      aspect-ratio: 0.64;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -888,13 +889,13 @@
     .joker-slot-empty {
       border: 2px dashed rgba(255, 255, 255, 0.18);
       border-radius: 8px;
-      width: clamp(74px, 10vw, 98px);
-      aspect-ratio: 0.66;
+      width: clamp(62px, 7.5vw, 82px);
+      aspect-ratio: 0.64;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       background: rgba(0, 0, 0, 0.22);
       color: #64748b;
-      gap: 3px;
+      gap: 2px;
       transition: border-color 0.15s ease;
     }
     .empty-slot-plus { font-size: 16px; font-weight: 700; color: #475569; }
@@ -1009,13 +1010,13 @@
 
     /* Truco Canto Badges Bar */
     .cantos-bar {
-      display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 6px;
       background: rgba(0, 0, 0, 0.65);
-      padding: 8px 12px;
+      padding: 6px 10px;
       border-radius: 10px;
       border: 1px solid var(--border);
     }
-    .cantos-bar .button-canto { min-height: 42px; padding: 7px 15px; font-size: 13px; font-weight: 700; letter-spacing: 0.05em; }
+    .cantos-bar .button-canto { min-height: 36px; padding: 5px 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; }
 
     /* Canto Response Prompt */
     .canto-response-bar {
@@ -1031,11 +1032,11 @@
     /* Player Hand */
     .player-cards-row {
       display: flex; justify-content: center; align-items: center;
-      gap: 12px; min-height: 126px; padding: 4px;
+      gap: 10px; min-height: 105px; padding: 2px;
     }
     .playing-card {
       position: relative;
-      width: clamp(74px, 10vw, 98px);
+      width: clamp(64px, 8vw, 88px);
       aspect-ratio: 0.66;
       border: 0; padding: 0;
       border-radius: 6px;
@@ -1161,23 +1162,23 @@
     /* Card Tooltip */
     .card-tooltip {
       position: fixed; z-index: 10001;
-      width: min(280px, calc(100vw - 20px));
+      width: min(320px, calc(100vw - 20px));
       max-height: calc(100vh - 16px);
       overflow-y: auto;
-      padding: 10px 12px;
+      padding: 12px 16px;
       border: 2px solid #ffffff;
-      border-radius: 8px;
-      background: rgba(12, 15, 19, 0.95);
+      border-radius: 10px;
+      background: rgba(10, 14, 20, 0.98);
       color: #fff;
-      box-shadow: 0 0 14px rgba(255, 255, 255, 0.2), 0 8px 24px rgba(0, 0, 0, 0.8);
+      box-shadow: 0 0 18px rgba(255, 255, 255, 0.3), 0 10px 28px rgba(0, 0, 0, 0.85);
       font-family: var(--font-small);
-      font-size: 11px;
-      line-height: 1.4;
+      font-size: 13px;
+      line-height: 1.45;
       pointer-events: none;
-      backdrop-filter: blur(6px);
+      backdrop-filter: blur(8px);
     }
-    .card-tooltip strong { display: block; margin-bottom: 4px; color: #ffffff; font-family: var(--font-ui); font-size: 12px; }
-    .card-tooltip p { margin: 2px 0; }
+    .card-tooltip strong { display: block; margin-bottom: 6px; color: #feca57; font-family: var(--font-ui); font-size: 15px; }
+    .card-tooltip p { margin: 3px 0; font-size: 13px; }
 
     /* Dialog Modals: Shop, Tutorial, Deck, Rules, Outcome */
     dialog {
@@ -1772,6 +1773,137 @@
     body[data-anim-quality="medium"] .felt-table {
       animation-duration: 40s !important;
     }
+  
+    .joker-desc-short {
+      font-family: var(--font-small);
+      font-size: 8px;
+      color: #feca57;
+      font-style: italic;
+      text-align: center;
+      margin: 1px 0;
+      line-height: 1.1;
+    }
+
+    /* Guided Tour Styles */
+    .tour-highlight {
+      outline: 3px solid #feca57 !important;
+      outline-offset: 4px !important;
+      box-shadow: 0 0 30px rgba(254, 202, 87, 0.95) !important;
+      z-index: 9998 !important;
+      transition: outline 0.2s ease, box-shadow 0.2s ease !important;
+    }
+    .tour-popover {
+      position: fixed; z-index: 10005;
+      max-width: 360px; width: 92vw;
+      background: rgba(14, 20, 28, 0.98);
+      border: 2px solid #feca57;
+      border-radius: 12px;
+      padding: 16px 18px;
+      box-shadow: 0 10px 35px rgba(0, 0, 0, 0.95), 0 0 25px rgba(254, 202, 87, 0.5);
+      backdrop-filter: blur(8px);
+      color: #fff;
+      animation: tour-appear 0.25s ease-out;
+    }
+    @keyframes tour-appear {
+      from { opacity: 0; transform: scale(0.92); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .tour-step-badge {
+      font-size: 10px; font-weight: 700; color: #feca57; letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .tour-close-btn {
+      background: transparent; border: 0; color: #fff; font-size: 14px; cursor: pointer; float: right;
+    }
+    .tour-title {
+      margin: 8px 0 4px; font-family: var(--font-ui); font-size: 16px; color: #fff;
+    }
+    .tour-desc {
+      margin: 0 0 14px; font-family: var(--font-small); font-size: 13px; color: #cbd5e1; line-height: 1.45;
+    }
+    .tour-actions {
+      display: flex; justify-content: space-between; gap: 8px;
+    }
+
+  
+    /* Joker Placeholder Artwork with card_reverse.png */
+    .joker-art-container {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border-radius: 4px;
+      margin: 1px 0;
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .joker-art-img {
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      display: block;
+      pointer-events: none;
+      border-radius: 3px;
+    }
+    .joker-title-text {
+      font-family: var(--font-ui);
+      font-size: 8px;
+      font-weight: 700;
+      color: #ffffff;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 50px;
+    }
+    .joker-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      position: relative;
+      z-index: 10;
+      width: 100%;
+    }
+    .joker-move-controls {
+      display: flex;
+      justify-content: center;
+      gap: 3px;
+      width: 100%;
+      margin-top: 1px;
+    }
+    .joker-move-btn {
+      flex: 1;
+      height: 16px;
+      border-radius: 3px;
+      background: #1f2937;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+      font-size: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0;
+      transition: background 0.1s, transform 0.08s;
+    }
+    .joker-move-btn:hover:not(:disabled) {
+      background: #feca57;
+      color: #000;
+      border-color: #fff;
+      transform: scale(1.08);
+    }
+    .joker-move-btn:disabled {
+      opacity: 0.2;
+      cursor: not-allowed;
+    }
+
   </style>
 </head>
 <body>
@@ -1821,11 +1953,17 @@
 
       <div class="intro-menu-buttons">
         <button id="introPlayGameBtn" class="arcade-btn intro-btn-play" type="button">
-          <span>▶</span> JUGAR <span>➔</span>
+          <span>▶</span> NUEVA PARTIDA <span>➔</span>
+        </button>
+        <button id="introResumeGameBtn" class="arcade-btn intro-btn-play" type="button" style="display: none; background: linear-gradient(135deg, #0984e3 0%, #00cec9 100%); border-color: #74b9ff;">
+          <span>▶</span> CONTINUAR RUN <span>➔</span>
         </button>
         <div class="intro-sub-buttons">
+          <button id="introInteractiveTourBtn" class="arcade-btn button button-primary" type="button" style="color: #1a1700;">
+            🎓 JUGAR TUTORIAL
+          </button>
           <button id="introTutorialBtn" class="arcade-btn button button-quiet" type="button">
-            CÓMO JUGAR
+            REGLAS
           </button>
           <button id="introDeckBtn" class="arcade-btn button button-quiet" type="button">
             VER MAZO
@@ -1900,7 +2038,7 @@
             <div class="stat-pill-val" id="tricksDisplay">0 / 3</div>
           </div>
           <div class="stat-pill">
-            <div class="stat-pill-label">CAMBIOS</div>
+            <div class="stat-pill-label">DESCARTES</div>
             <div class="stat-pill-val red-val" id="discardsDisplay">3</div>
           </div>
         </div>
@@ -1934,6 +2072,7 @@
 
         <!-- Sidebar Utility Buttons -->
         <div class="sidebar-actions-grid">
+          <button class="button button-quiet arcade-btn" id="returnToMenuBtn" type="button" style="color: #feca57; font-weight: 700;">🏠 MENÚ</button>
           <button class="button button-quiet arcade-btn" id="tutorialOpenButton" type="button">CÓMO JUGAR</button>
           <button class="button button-quiet arcade-btn" id="openLeaderboardButton" type="button">🏆 RÉCORDS</button>
           <button class="button button-quiet arcade-btn" id="toggleRulesButton" type="button">REGLAS</button>
@@ -2012,9 +2151,10 @@
 
           <!-- Primary Action Buttons -->
           <div class="primary-actions-row">
-            <button class="button button-quiet arcade-btn" id="playModeButton" type="button" aria-pressed="true">Modo Jugar</button>
-            <button class="button button-quiet arcade-btn" id="discardModeButton" type="button" aria-pressed="false">Modo Cambiar</button>
+            <button class="button button-quiet arcade-btn" id="playModeButton" type="button" aria-pressed="true" style="display: none;">Modo Jugar</button>
+            <button class="button button-quiet arcade-btn" id="discardModeButton" type="button" aria-pressed="false" style="display: none;">Modo Descartar</button>
             <button class="button btn-play-card arcade-btn" id="actionButton" type="button" disabled>JUGAR CARTA ➔</button>
+            <button class="button btn-discard-card arcade-btn" id="discardActionButton" type="button" disabled>DESCARTAR ➔</button>
             <button class="button btn-tanto arcade-btn" id="showTantoButton" type="button">VER TANTO</button>
             <button class="button button-primary arcade-btn button-next" id="nextRoundButton" type="button">SIGUIENTE RONDA ➔</button>
           </div>
@@ -2160,7 +2300,7 @@
           <input id="roundsInput" type="number" min="1" max="20" value="4">
         </div>
         <div class="field">
-          <label for="discardsInput">Cambios disponibles</label>
+          <label for="discardsInput">Descartes disponibles</label>
           <input id="discardsInput" type="number" min="0" max="20" value="3">
         </div>
         <div class="field">
@@ -2394,6 +2534,21 @@
   </dialog>
 
   <script type="module" src="src/ui/main.js"></script>
+
+  <!-- Guided Interactive Tour Tooltip Overlay -->
+  <div id="tourPopover" class="tour-popover" hidden>
+    <div class="tour-header">
+      <span class="tour-step-badge" id="tourStepBadge">PASO 1 / 7</span>
+      <button id="tourCloseBtn" class="tour-close-btn" type="button" title="Cerrar tutorial">✕</button>
+    </div>
+    <h3 class="tour-title" id="tourTitle">Título del paso</h3>
+    <p class="tour-desc" id="tourDesc">Descripción explicativa del paso.</p>
+    <div class="tour-actions">
+      <button id="tourPrevBtn" class="button button-quiet arcade-btn" type="button">◀ ANTERIOR</button>
+      <button id="tourNextBtn" class="button button-primary arcade-btn" type="button">SIGUIENTE ▶</button>
+    </div>
+  </div>
+
 </body>
 </html>
 

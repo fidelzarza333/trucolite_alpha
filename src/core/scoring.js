@@ -26,10 +26,11 @@ export function scoreRound(ctx, effects) {
   const xmultBase = levelName ? ctx.rules.cantos[levelName].xMult : 1;
   const xmult = applyStage(xmultBase, activeEffects, "xmult");
   const earned = winner === "player" ? Math.floor(chips * mult * xmult) : 0;
-  const lossTruco = winner === "rival" && levelName ? ctx.rules.cantos[levelName].lossPenalty : 0;
-  const lossEnvido = ctx.round.envido === "lost" ? ctx.rules.cantos.envido.lossPenalty : 0;
-  const lossFlor = ctx.round.flor === "lost" ? ctx.rules.cantos.flor.lossPenalty : 0;
-  const score = Math.max(0, ctx.score + earned - lossTruco - lossEnvido - lossFlor);
+  // Feedback de testers: perder no quita puntos acumulados
+  const lossTruco = 0;
+  const lossEnvido = 0;
+  const lossFlor = 0;
+  const score = ctx.score + earned;
   return {
     winner,
     playerTricks,

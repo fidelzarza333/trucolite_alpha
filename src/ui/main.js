@@ -36,6 +36,17 @@ const elements = {
   playerState: document.querySelector("#playerState"),
   history: document.querySelector("#historyList"),
   action: document.querySelector("#actionButton"),
+  discardButton: document.querySelector("#discardActionButton"),
+  returnToMenuBtn: document.querySelector("#returnToMenuBtn"),
+  introResumeGameBtn: document.querySelector("#introResumeGameBtn"),
+  introInteractiveTourBtn: document.querySelector("#introInteractiveTourBtn"),
+  tourPopover: document.querySelector("#tourPopover"),
+  tourStepBadge: document.querySelector("#tourStepBadge"),
+  tourTitle: document.querySelector("#tourTitle"),
+  tourDesc: document.querySelector("#tourDesc"),
+  tourPrevBtn: document.querySelector("#tourPrevBtn"),
+  tourNextBtn: document.querySelector("#tourNextBtn"),
+  tourCloseBtn: document.querySelector("#tourCloseBtn"),
   note: document.querySelector("#controlNote"),
   next: document.querySelector("#nextRoundButton"),
   playMode: document.querySelector("#playModeButton"),
@@ -734,6 +745,16 @@ async function handleCantarWithPacing(action) {
       renderGame(elements, state, { ...ui, cantoAvailable });
     }
 
+    const instantCantoEvt = result.events.find((e) => e.type === "ENVIDO_RESOLVED" || e.type === "FLOR_RESOLVED");
+    if (instantCantoEvt) {
+      const cantoName = instantCantoEvt.type === "ENVIDO_RESOLVED" ? "Envido" : "Flor";
+      const winnerLabel = instantCantoEvt.winner === "player" ? "¡Ganaste!" : "Ganó El Rival";
+      ui.message = `${cantoName}: ${winnerLabel} (${instantCantoEvt.playerTanto} vs ${instantCantoEvt.rivalTanto})`;
+      ui.tone = instantCantoEvt.winner === "player" ? "win" : "lose";
+      notify(`${cantoName}: ${winnerLabel} (${instantCantoEvt.playerTanto} vs ${instantCantoEvt.rivalTanto})`, instantCantoEvt.winner === "player" ? "win" : "lose");
+      renderGame(elements, state, { ...ui, cantoAvailable });
+    }
+
     if (roundResolvedEvt) {
       await delay(500);
       if (levelWonEvt) {
@@ -843,46 +864,83 @@ function renderJokerCollection() {
       card.className = `joker-card joker-card-${joker.rarity}`;
       card.dataset.jokerId = joker.id;
 
+      // Tooltip matching the exact card design: title, description, and custom description
+      card.dataset.cardTooltip = `${joker.description}\n${joker.shortDescription || "Lorem ipsum"}`;
+      card.setAttribute("aria-label", joker.name);
+
       const refund = ITEM_PRICES[joker.rarity] / 2;
 
-      // Header with rarity
+      // Header with name and rarity badge
       const header = document.createElement("div");
       header.className = "joker-header";
+
+      const nameText = document.createElement("span");
+      nameText.className = "joker-title-text";
+      nameText.textContent = joker.name;
+
       const rarityBadge = document.createElement("span");
       rarityBadge.className = "joker-rarity-badge";
-      rarityBadge.textContent = joker.rarity.replace("pocoComun", "poco común").toUpperCase();
-      header.append(rarityBadge);
+      rarityBadge.textContent = joker.rarity.replace("pocoComun", "P.COM").toUpperCase();
 
-      // Center vertical body with joker name
+      header.append(nameText, rarityBadge);
+
+      // Center body with card_reverse artwork as placeholder
       const body = document.createElement("div");
-      body.className = "joker-placeholder-body";
-      const icon = document.createElement("div");
-      icon.className = "joker-card-icon";
-      icon.textContent = "🃏";
-      const nameText = document.createElement("div");
-      nameText.className = "joker-name-text";
-      nameText.textContent = joker.name;
-      body.append(icon, nameText);
+      body.className = "joker-art-container";
+      const artImg = document.createElement("img");
+      artImg.className = "joker-art-img";
+      artImg.src = "assets/cards/card_reverse.png";
+      artImg.alt = joker.name;
+      artImg.draggable = false;
+      body.append(artImg);
 
-      // Bottom bar with sell button
+      // Footer: Vender button + Move buttons EXACTLY UNDER the sell button
       const footer = document.createElement("div");
       footer.className = "joker-footer";
+
       const sellBtn = document.createElement("button");
       sellBtn.className = "button button-sell arcade-btn";
       sellBtn.type = "button";
-      sellBtn.textContent = `Vender $${formatMoney(refund)}`;
-      sellBtn.setAttribute("aria-label", `Vender ${joker.name} por $${formatMoney(refund)}`);
+      sellBtn.textContent = `Vender ${formatMoney(refund)}`;
+      sellBtn.setAttribute("aria-label", `Vender ${joker.name} por ${formatMoney(refund)}`);
       sellBtn.addEventListener("click", (e) => {
         e.stopPropagation();
+        e.preventDefault();
         applyAction({ type: "SELL_JOKER", itemId: joker.id });
       });
       footer.append(sellBtn);
 
-      card.append(header, body, footer);
-      card.title = `${joker.name}: ${joker.description}`;
-      card.addEventListener("click", () => {
-        triggerToast(`${joker.name}: ${joker.description}`, "gold");
+      const moveControls = document.createElement("div");
+      moveControls.className = "joker-move-controls";
+
+      const leftBtn = document.createElement("button");
+      leftBtn.className = "joker-move-btn arcade-btn";
+      leftBtn.type = "button";
+      leftBtn.innerHTML = "◀";
+      leftBtn.title = "Mover a la izquierda";
+      leftBtn.disabled = slotIndex === 0;
+      leftBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        applyAction({ type: "MOVE_JOKER", fromIndex: slotIndex, toIndex: slotIndex - 1 });
       });
+
+      const rightBtn = document.createElement("button");
+      rightBtn.className = "joker-move-btn arcade-btn";
+      rightBtn.type = "button";
+      rightBtn.innerHTML = "▶";
+      rightBtn.title = "Mover a la derecha";
+      rightBtn.disabled = slotIndex >= state.jokers.length - 1;
+      rightBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        applyAction({ type: "MOVE_JOKER", fromIndex: slotIndex, toIndex: slotIndex + 1 });
+      });
+
+      moveControls.append(leftBtn, rightBtn);
+      footer.append(moveControls);
+
+      card.append(header, body, footer);
       elements.jokerList.append(card);
     } else {
       // Empty slot placeholder
@@ -949,15 +1007,17 @@ function renderShop() {
     if (item.kind === "joker") {
       card.classList.add("shop-item-joker", `joker-card-${item.rarity}`);
       const body = document.createElement("div");
-      body.className = "joker-placeholder-body";
-      const icon = document.createElement("div");
-      icon.className = "joker-card-icon";
-      icon.textContent = "🃏";
-      const nameText = document.createElement("div");
-      nameText.className = "joker-name-text";
-      nameText.textContent = item.name;
-      body.append(icon, nameText);
-      card.append(body);
+      body.className = "joker-art-container";
+      const artImg = document.createElement("img");
+      artImg.className = "joker-art-img";
+      artImg.src = "assets/cards/card_reverse.png";
+      artImg.alt = item.name;
+      artImg.draggable = false;
+      body.append(artImg);
+      const title = document.createElement("h3");
+      title.className = "shop-item-title";
+      title.textContent = item.name;
+      card.append(title, body);
     } else {
       const title = document.createElement("h3");
       title.className = "shop-item-title";
@@ -1092,24 +1152,27 @@ async function playSelectedCard() {
 }
 
 function updateSelection(button) {
-  if (isPacing || (ui.mode === "discard" && (state.round.playerPlayedCount > 0 || state.discardsRemaining <= 0))) return;
+  if (isPacing || !state || state.phase !== "playing") return;
   SFX.playCard();
   const id = button.dataset.cardId;
-  if (ui.mode === "play") {
-    if (ui.selectedIds.has(id)) ui.selectedIds.clear();
-    else {
-      ui.selectedIds.clear();
-      ui.selectedIds.add(id);
-    }
-  } else if (ui.selectedIds.has(id)) {
+  if (ui.selectedIds.has(id)) {
     ui.selectedIds.delete(id);
   } else {
     ui.selectedIds.add(id);
   }
   button.classList.toggle("is-selected", ui.selectedIds.has(id));
   button.setAttribute("aria-pressed", String(ui.selectedIds.has(id)));
-  elements.action.disabled = ui.selectedIds.size === 0;
-  if (ui.mode === "discard" && state.discardsRemaining <= 0) elements.action.disabled = true;
+
+  const count = ui.selectedIds.size;
+  const discardOpen = state.round.playerPlayedCount === 0 && state.discardsRemaining > 0;
+  const isTurn = state.round.table.rivalCard !== null || state.round.leader === "player";
+
+  if (elements.action) {
+    elements.action.disabled = count !== 1 || !isTurn;
+  }
+  if (elements.discardButton) {
+    elements.discardButton.disabled = count === 0 || !discardOpen;
+  }
 }
 
 // Truco power tier names (rank 14 = strongest, rank 1 = weakest)
@@ -1250,12 +1313,15 @@ document.addEventListener("click", (e) => {
 
 elements.restart.addEventListener("click", () => startMatch({ forceNewSeed: true }));
 elements.action.addEventListener("click", () => {
-  if (ui.mode === "discard") {
-    applyAction({ type: "DISCARD", ids: Array.from(ui.selectedIds) });
-  } else {
-    playSelectedCard();
-  }
+  playSelectedCard();
 });
+if (elements.discardButton) {
+  elements.discardButton.addEventListener("click", () => {
+    if (ui.selectedIds.size > 0) {
+      applyAction({ type: "DISCARD", ids: Array.from(ui.selectedIds) });
+    }
+  });
+}
 elements.next.addEventListener("click", () => applyAction({ type: "NEXT_ROUND" }));
 elements.cantoWant.addEventListener("click", () => applyAction({ type: "ANSWER_CANTO", wants: true }));
 elements.cantoReject.addEventListener("click", () => applyAction({ type: "ANSWER_CANTO", wants: false }));
@@ -1293,6 +1359,28 @@ elements.playerCards.addEventListener("click", (event) => {
   if (!button || !state || state.phase !== "playing") return;
   updateSelection(button);
 });
+
+// Tooltip for cards on table (including rival cards)
+elements.trickRow.addEventListener("pointerover", (event) => {
+  const card = event.target.closest("[data-card-tooltip]");
+  if (card && elements.trickRow.contains(card)) showCardTooltip(card);
+});
+elements.trickRow.addEventListener("pointerout", (event) => {
+  const card = event.target.closest("[data-card-tooltip]");
+  if (card && !card.contains(event.relatedTarget)) elements.cardTooltip.hidden = true;
+});
+
+
+// Tooltip for Jokers matching exact playing cards design
+elements.jokerList.addEventListener("pointerover", (event) => {
+  const card = event.target.closest("[data-card-tooltip]");
+  if (card && elements.jokerList.contains(card)) showCardTooltip(card);
+});
+elements.jokerList.addEventListener("pointerout", (event) => {
+  const card = event.target.closest("[data-card-tooltip]");
+  if (card && !card.contains(event.relatedTarget)) elements.cardTooltip.hidden = true;
+});
+
 elements.playerCards.addEventListener("pointerover", (event) => {
   const button = event.target.closest("[data-card-tooltip]");
   if (button && elements.playerCards.contains(button)) showCardTooltip(button);
@@ -1547,15 +1635,16 @@ function fadeAudio(audio, targetVolume, durationMs, onComplete) {
 }
 
 // ========================================================
-// ALTERNATING 2-TRACK MAIN THEME (main.mp3 <-> main2.mp3)
+// ALTERNATING 3-TRACK MAIN THEME (main.mp3 <-> main2.mp3 <-> main3.mp3)
 // ========================================================
 
 const BGM = (() => {
   const MUSIC_VOL = 0.35; // base music volume (lowered decibels by default)
-  const playlist = ["assets/audio/main.mp3", "assets/audio/main2.mp3"];
+  const playlist = ["assets/audio/main.mp3", "assets/audio/main2.mp3", "assets/audio/main3.mp3"];
   let trackIndex = 0;
   let el = null;
   let isRunning = false;
+  let isUserPaused = false;
   let masterVol = MUSIC_VOL;
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -1575,33 +1664,121 @@ const BGM = (() => {
     requestAnimationFrame(step);
   }
 
+  function playTrack(idx) {
+    if (!el || !isRunning || isUserPaused) return;
+    trackIndex = ((idx % playlist.length) + playlist.length) % playlist.length;
+    const nextSrc = playlist[trackIndex];
+    if (el.src !== nextSrc && !el.src.endsWith(nextSrc)) {
+      el.src = nextSrc;
+    }
+    el.currentTime = 0;
+    el.volume = masterVol;
+
+    const promise = el.play();
+    if (promise !== undefined) {
+      promise.catch(() => {
+        // Wait for canplay event if resource is loading
+        const onCanPlay = () => {
+          el.removeEventListener("canplay", onCanPlay);
+          if (isRunning && !isUserPaused) {
+            el.play().catch(() => {});
+          }
+        };
+        el.addEventListener("canplay", onCanPlay, { once: true });
+
+        // Safety fallback timeout in case canplay is missed
+        setTimeout(() => {
+          if (isRunning && !isUserPaused && el.paused) {
+            el.play().catch(() => {});
+          }
+        }, 400);
+      });
+    }
+  }
+
   function init() {
     if (el) return el;
     el = document.createElement("audio");
     el.src = playlist[trackIndex];
-    el.loop = false; // Alternates tracks when each ends
+    el.loop = false; // Alternates tracks smoothly via ended event & watchdog
     el.preload = "auto";
     el.volume = 0;
     el.dataset.bgmLayer = "main";
+
+    // Advance seamlessly when each track finishes
     el.addEventListener("ended", () => {
-      trackIndex = (trackIndex + 1) % playlist.length;
-      el.src = playlist[trackIndex];
-      el.volume = masterVol;
-      el.play().catch(() => {});
+      if (isRunning && !isUserPaused) {
+        playTrack(trackIndex + 1);
+      }
     });
+
+    // In case of load/decode error, recover by advancing to next track
+    el.addEventListener("error", (e) => {
+      console.warn("BGM track load error on", playlist[trackIndex], e);
+      if (isRunning && !isUserPaused) {
+        setTimeout(() => {
+          playTrack(trackIndex + 1);
+        }, 500);
+      }
+    });
+
     document.body.appendChild(el);
     return el;
   }
 
   function start(vol) {
     if (typeof vol === "number") masterVol = clamp(vol, 0, 1);
-    if (isRunning) return;
+    isUserPaused = false;
     isRunning = true;
     init();
-    el.volume = 0;
-    el.play().then(() => {
-      rampTo(masterVol, 1500);
-    }).catch(() => {});
+
+    if (el.paused) {
+      el.volume = 0;
+      const promise = el.play();
+      if (promise !== undefined) {
+        promise.then(() => {
+          rampTo(masterVol, 1500);
+        }).catch(() => {
+          // If autoplay is blocked before interaction, retry on first interaction
+          const resumeOnInteract = () => {
+            window.removeEventListener("click", resumeOnInteract);
+            window.removeEventListener("keydown", resumeOnInteract);
+            if (isRunning && !isUserPaused && el.paused) {
+              el.play().then(() => rampTo(masterVol, 1500)).catch(() => {});
+            }
+          };
+          window.addEventListener("click", resumeOnInteract, { once: true });
+          window.addEventListener("keydown", resumeOnInteract, { once: true });
+        });
+      }
+    } else {
+      rampTo(masterVol, 500);
+    }
+  }
+
+  function pause() {
+    isUserPaused = true;
+    if (el) el.pause();
+  }
+
+  function resume() {
+    isUserPaused = false;
+    isRunning = true;
+    if (el) {
+      el.play().then(() => rampTo(masterVol, 500)).catch(() => {});
+    } else {
+      start();
+    }
+  }
+
+  function toggle() {
+    if (isUserPaused || (el && el.paused)) {
+      resume();
+      return true; // is now playing
+    } else {
+      pause();
+      return false; // is now paused
+    }
   }
 
   function stop(durationMs = 800) {
@@ -1616,21 +1793,66 @@ const BGM = (() => {
   }
 
   function setZone() {
-    // 2-track alternating playlist mode
+    // Alternating playlist mode
   }
 
-  return { init, start, stop, setZone, setVolume, getActiveRole: () => "main", getEl: () => el };
+  // Active watchdog: guarantees BGM never stalls or cuts off unexpectedly during game or tutorial
+  setInterval(() => {
+    if (isRunning && !isUserPaused && el) {
+      if (el.paused) {
+        if (el.ended) {
+          playTrack(trackIndex + 1);
+        } else if (!document.hidden) {
+          el.play().catch(() => {
+            if (el.readyState === 0) {
+              playTrack(trackIndex);
+            }
+          });
+        }
+      }
+    }
+  }, 2500);
+
+  return { init, start, stop, pause, resume, toggle, playTrack, setZone, setVolume, getActiveRole: () => "main", getEl: () => el };
 })();
+
+// Safe stop & fade for the intro menu audio track
+function stopMenuAudio() {
+  if (elements.menuAudio) {
+    const audio = elements.menuAudio;
+    elements.menuAudio = null;
+    fadeAudio(audio, 0, 400, () => {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.remove();
+    });
+  }
+}
+
+if (elements.menuAudio) {
+  elements.menuAudio.loop = true;
+  elements.menuAudio.addEventListener("ended", () => {
+    if (elements.menuAudio) {
+      elements.menuAudio.currentTime = 0;
+      elements.menuAudio.play().catch(() => {});
+    }
+  });
+}
 
 for (const [canto, button] of Object.entries(elements.cantos)) {
   button.addEventListener("click", () => applyAction({ type: "CANTAR", canto }));
 }
 tutorial.start.addEventListener("click", () => {
+  stopMenuAudio();
+  if (intro.menu) intro.menu.classList.add("is-hidden");
+  BGM.start();
   const started = startMatch();
   if (started || !state) tutorial.dialog.close();
 });
 tutorial.close.addEventListener("click", () => tutorial.dialog.close());
 tutorial.open.addEventListener("click", () => {
+  stopMenuAudio();
+  BGM.start();
   tutorial.start.hidden = Boolean(state);
   tutorial.close.hidden = !state;
   tutorial.dialog.showModal();
@@ -1670,6 +1892,154 @@ tutorial.dialog.addEventListener("cancel", (event) => {
   // Default: show truco tab
   switchTab("truco");
 })();
+
+
+// ========================================================
+// INTERACTIVE GUIDED TOUR
+// ========================================================
+const tourSteps = [
+  {
+    target: ".score-target-box",
+    title: "1. OBJETIVO Y ANTES",
+    desc: "Tu objetivo es alcanzar el puntaje requerido antes de agotar las rondas del nivel. Cada victoria te da dinero y sube el ante."
+  },
+  {
+    target: ".chips-mult-grid",
+    title: "2. FICHAS × MULTIPLICADOR",
+    desc: "Los puntos se calculan como Fichas × Mult × xMult de Truco. ¡Tus comodines y cantos aumentan estos valores en tiempo real!"
+  },
+  {
+    target: ".jokers-section",
+    title: "3. COMODINES (JOKERS)",
+    desc: "Podés tener hasta 5 comodines con sinergias rotas. Usá las flechas ◀ ▶ para ordenarlos y potenciar sus efectos posicionales."
+  },
+  {
+    target: ".bazas-felt-container",
+    title: "4. LA MESA DE BAZAS",
+    desc: "Cada ronda se disputa a 3 bazas. Pasá el ratón sobre cualquier carta jugada (propia o del Rival) para inspeccionar su fuerza de Truco."
+  },
+  {
+    target: ".cantos-bar",
+    title: "5. CANTOS CRIOLLOS",
+    desc: "Cantá Envido o Flor antes de tirar tu primera carta para ganar dinero ($1) y mult. Cantá Truco para multiplicar la apuesta."
+  },
+  {
+    target: ".bottom-section",
+    title: "6. TUS CARTAS Y ACCIONES",
+    desc: "Seleccioná 1 carta para jugarla en la baza, o seleccioná de 1 a 3 para descartar y robar cartas nuevas del mazo."
+  },
+  {
+    target: "#deckPileButton",
+    title: "7. EL MAZO COMPLETO",
+    desc: "Tocá la pila del mazo en cualquier momento para ver todas las 40 cartas y cuáles faltan por salir ordenadas por poder."
+  }
+];
+
+let tourCurrentIndex = 0;
+
+function showTourStep(index) {
+  if (index < 0 || index >= tourSteps.length) {
+    endTour();
+    return;
+  }
+  tourCurrentIndex = index;
+  const step = tourSteps[index];
+
+  // Remove previous highlights
+  document.querySelectorAll(".tour-highlight").forEach(el => el.classList.remove("tour-highlight"));
+
+  const targetEl = document.querySelector(step.target);
+  if (targetEl) {
+    targetEl.classList.add("tour-highlight");
+    targetEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  if (elements.tourStepBadge) elements.tourStepBadge.textContent = `PASO ${index + 1} / ${tourSteps.length}`;
+  if (elements.tourTitle) elements.tourTitle.textContent = step.title;
+  if (elements.tourDesc) elements.tourDesc.textContent = step.desc;
+
+  if (elements.tourPrevBtn) {
+    elements.tourPrevBtn.disabled = index === 0;
+  }
+  if (elements.tourNextBtn) {
+    elements.tourNextBtn.textContent = index === tourSteps.length - 1 ? "FINALIZAR ✓" : "SIGUIENTE ▶";
+  }
+
+  if (elements.tourPopover) {
+    elements.tourPopover.hidden = false;
+    // Position popover conveniently
+    if (targetEl) {
+      const rect = targetEl.getBoundingClientRect();
+      const popoverRect = elements.tourPopover.getBoundingClientRect();
+      let top = rect.bottom + 10;
+      if (top + popoverRect.height > window.innerHeight - 10) {
+        top = Math.max(10, rect.top - popoverRect.height - 10);
+      }
+      let left = Math.max(10, Math.min(rect.left, window.innerWidth - 370));
+      elements.tourPopover.style.top = `${top}px`;
+      elements.tourPopover.style.left = `${left}px`;
+    }
+  }
+}
+
+function startTour() {
+  stopMenuAudio();
+  BGM.start();
+  if (!state) {
+    startMatch();
+  }
+  if (intro.menu) intro.menu.classList.add("is-hidden");
+  showTourStep(0);
+}
+
+function endTour() {
+  document.querySelectorAll(".tour-highlight").forEach(el => el.classList.remove("tour-highlight"));
+  if (elements.tourPopover) elements.tourPopover.hidden = true;
+  try { localStorage.setItem("trucolite_tutorial_seen", "true"); } catch (e) {}
+}
+
+if (elements.tourNextBtn) {
+  elements.tourNextBtn.addEventListener("click", () => {
+    if (tourCurrentIndex >= tourSteps.length - 1) endTour();
+    else showTourStep(tourCurrentIndex + 1);
+  });
+}
+if (elements.tourPrevBtn) {
+  elements.tourPrevBtn.addEventListener("click", () => {
+    if (tourCurrentIndex > 0) showTourStep(tourCurrentIndex - 1);
+  });
+}
+if (elements.tourCloseBtn) {
+  elements.tourCloseBtn.addEventListener("click", () => endTour());
+}
+
+if (elements.introInteractiveTourBtn) {
+  elements.introInteractiveTourBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    startTour();
+  });
+}
+
+// Return to menu button logic
+if (elements.returnToMenuBtn) {
+  elements.returnToMenuBtn.addEventListener("click", () => {
+    if (intro.menu) {
+      intro.menu.classList.remove("is-hidden");
+      intro.menu.style.display = "flex";
+      if (elements.introResumeGameBtn) {
+        elements.introResumeGameBtn.style.display = "inline-flex";
+      }
+    }
+  });
+}
+if (elements.introResumeGameBtn) {
+  elements.introResumeGameBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (intro.menu) {
+      intro.menu.classList.add("is-hidden");
+    }
+  });
+}
 
 // Pitch-Black Cinematic Intro Menu
 const intro = {
@@ -1719,23 +2089,14 @@ if (intro.playGameBtn) {
     e.stopPropagation();
 
     // 1. Smoothly fade out menu track and completely remove it
-    if (elements.menuAudio) {
-      fadeAudio(elements.menuAudio, 0, 700, () => {
-        elements.menuAudio.pause();
-        elements.menuAudio.currentTime = 0;
-        elements.menuAudio.remove();
-        elements.menuAudio = null;
-      });
-    }
+    stopMenuAudio();
 
-    // 2. Hide and dissolve the pitch-black intro overlay
+    // 2. Hide the intro overlay (keep in DOM so player can return)
     if (intro.menu) {
       intro.menu.classList.add("is-hidden");
-      setTimeout(() => { intro.menu.remove(); }, 850);
     }
 
-    // 3. Start the alternating BGM system (main.mp3 <-> main2.mp3)
-    BGM.init();
+    // 3. Start the alternating BGM system (main.mp3 <-> main2.mp3 <-> main3.mp3)
     BGM.start();
 
     // 4. Start the game match
@@ -1748,6 +2109,8 @@ if (intro.playGameBtn) {
 if (intro.tutorialBtn) {
   intro.tutorialBtn.addEventListener("click", (e) => {
     e.stopPropagation();
+    stopMenuAudio();
+    BGM.start();
     tutorial.start.hidden = Boolean(state);
     tutorial.close.hidden = !state;
     tutorial.dialog.showModal();
@@ -1768,8 +2131,10 @@ elements.playMode.disabled = true;
 elements.discardMode.disabled = true;
 for (const button of Object.values(elements.cantos)) button.disabled = true;
 
-// If intro menu is present, don't popup the tutorial modal automatically
+// If intro menu is not present, start main BGM and show tutorial modal
 if (!intro.menu) {
+  stopMenuAudio();
+  BGM.start();
   tutorial.dialog.showModal();
 }
 
@@ -1892,17 +2257,13 @@ initParallaxTracking();
   }
 
   // BGM pause/resume in sidebar
-  let bgmPaused = false;
   if (bgmToggleBtn) {
     bgmToggleBtn.addEventListener("click", () => {
-      bgmPaused = !bgmPaused;
-      const layers = document.querySelectorAll("audio[data-bgm-layer]");
-      if (bgmPaused) {
-        layers.forEach(el => el.pause());
+      const isPlaying = BGM.toggle();
+      if (!isPlaying) {
         bgmToggleBtn.innerHTML = "<span>▶</span> REANUDAR";
         bgmToggleBtn.classList.remove("playing");
       } else {
-        layers.forEach(el => el.play().catch(() => {}));
         bgmToggleBtn.innerHTML = "<span>⏸</span> PAUSAR";
         bgmToggleBtn.classList.add("playing");
       }

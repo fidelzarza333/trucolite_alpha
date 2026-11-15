@@ -1,10 +1,28 @@
 import { cardPower } from "../core/cards.js";
+import { getRoundEffects } from "../core/game.js";
 
 const SUIT_NAMES = {
   espadas: "Espadas",
   bastos: "Bastos",
   oros: "Oros",
   copas: "Copas"
+};
+
+export const POWER_TIER_NAMES = {
+  14: "1º · El Macho (1♠)",
+  13: "2º · El Bastón (1♣)",
+  12: "3º · La Espadilla (7♠)",
+  11: "4º · El Siete Bravo (7♦)",
+  10: "5º · Tres (todos)",
+  9:  "6º · Dos (todos)",
+  8:  "7º · 1 de Copas/Oros",
+  7:  "8º · Reyes (12)",
+  6:  "9º · Caballos (11)",
+  5:  "10º · Sotas (10)",
+  4:  "11º · 7 de Copas/Bastos",
+  3:  "12º · Seis (todos)",
+  2:  "13º · Cinco (todos)",
+  1:  "14º · Cuatro (todos) — menor"
 };
 
 const SUIT_ICONS = {
@@ -121,14 +139,27 @@ export function cardModifierSummary(card, state) {
   }
   const sum = (values) => values.reduce((total, value) => total + value, 0);
   const fmt = (value) => Number(value.toFixed(2)).toString();
+  const power = cardPower(card);
+  const totalChips = sum(chips);
+  const totalMult = sum(mults);
+
+  let realScoreText = `Puntaje real = ${power}`;
+  if (totalChips > 0 && totalMult > 0) {
+    realScoreText = `Puntaje real = ${power} + ${fmt(totalChips)} chips + ${fmt(totalMult)} mult`;
+  } else if (totalChips > 0) {
+    realScoreText = `Puntaje real = ${power} + ${fmt(totalChips)} chips`;
+  } else if (totalMult > 0) {
+    realScoreText = `Puntaje real = ${power} + ${fmt(totalMult)} mult`;
+  }
+
   const lines = [
-    `Fuerza de baza: ${cardPower(card)} (no suma directamente al puntaje)`,
+    `Fuerza de baza: ${power} (no suma directamente al puntaje)`,
+    realScoreText,
     `Puntaje base: +${state.rules.chipsPerTrick} fichas por baza ganada (suman si ganás la ronda)`
   ];
-  if (chips.length) lines.push(`Modificador: +${fmt(sum(chips))} fichas (si ganás la ronda)`);
-  if (mults.length) lines.push(`Modificador: +${fmt(sum(mults))} al multiplicador`);
+  if (chips.length) lines.push(`Modificador: +${fmt(totalChips)} fichas (si ganás la ronda)`);
+  if (mults.length) lines.push(`Modificador: +${fmt(totalMult)} al multiplicador`);
   if (money.length) lines.push(`Dinero: +$${fmt(sum(money))} al resolver la ronda, aunque la pierdas`);
-  if (!chips.length && !mults.length && !money.length) lines.push("Sin modificadores aplicables al jugarla");
   lines.push(...modifierDetails);
   return lines;
 }
@@ -248,9 +279,24 @@ function renderTricks(element, state) {
       if (playerCard) {
         const face = cardFace(playerCard);
         addUpgradeSeals(face, playerCard, state);
+        const summary = cardModifierSummary(playerCard, state);
+        face.dataset.cardTooltip = summary.join("\n");
+        face.setAttribute("aria-label", `${cardName(playerCard)}. ${summary.join(". ")}`);
         pair.append(face);
       }
-      if (rivalCard) pair.append(cardFace(rivalCard));
+      if (rivalCard) {
+        const face = cardFace(rivalCard);
+        const power = cardPower(rivalCard);
+        const hierName = POWER_TIER_NAMES[power] || `${power}/14`;
+        const rivalSummary = [
+          `Carta de El Rival: ${cardName(rivalCard)}`,
+          `Fuerza de baza: ${power} / 14 (${hierName})`,
+          `Puntaje real = ${power}`
+        ];
+        face.dataset.cardTooltip = rivalSummary.join("\n");
+        face.setAttribute("aria-label", `Carta de El Rival: ${cardName(rivalCard)}. Fuerza de baza: ${power}. Puntaje real = ${power}.`);
+        pair.append(face);
+      }
       slot.append(pair);
       const label = document.createElement("span");
       label.className = "trick-slot-badge";
@@ -365,6 +411,19 @@ export function renderGame(elements, state, ui) {
   const trucoLvl = state.round.trucoLevel;
   const trucoMultiplier = trucoLvl === 1 ? 2 : trucoLvl === 2 ? 3 : trucoLvl === 3 ? 4 : 1;
 
+  // Calculamos los efectos activos en tiempo real (jokers, mejoras, descartes)
+  const roundEffects = getRoundEffects(state);
+  for (let eIdx = 0; eIdx < roundEffects.effects.length; eIdx += 1) {
+    const eff = roundEffects.effects[eIdx];
+    if (eff.stage === "chips") {
+      if (eff.op === "add" || !eff.op) activeChips += eff.value;
+      if (eff.op === "mul") activeChips *= eff.value;
+    } else if (eff.stage === "mult") {
+      if (eff.op === "add" || !eff.op) activeMult += eff.value;
+      if (eff.op === "mul") activeMult *= eff.value;
+    }
+  }
+
   if (elements.chipsDisplay) {
     elements.chipsDisplay.textContent = String(activeChips);
   }
@@ -417,7 +476,7 @@ export function renderGame(elements, state, ui) {
   }
   if (state.phase === "playing") {
     elements.opponentState.textContent = state.round.table.rivalCard ? "Jugó · tu turno" : "Esperando tu jugada";
-    elements.playerState.textContent = `Tu turno · cambios: ${state.discardsRemaining}`;
+    elements.playerState.textContent = `Tu turno · descartes: ${state.discardsRemaining}`;
   } else if (state.phase === "respondCanto") {
     elements.opponentState.textContent = "Cantó · espera tu respuesta";
     elements.playerState.textContent = "Respondé al canto";
@@ -431,15 +490,22 @@ export function renderGame(elements, state, ui) {
     elements.opponentState.textContent = "Run terminada";
     elements.playerState.textContent = "Derrota";
   }
-  elements.playMode.setAttribute("aria-pressed", String(ui.mode === "play"));
-  elements.discardMode.setAttribute("aria-pressed", String(ui.mode === "discard"));
-  elements.action.textContent = ui.mode === "play" ? "Jugar carta" : "Cambiar seleccionadas";
+  if (elements.playMode) elements.playMode.setAttribute("aria-pressed", String(ui.mode === "play"));
+  if (elements.discardMode) elements.discardMode.setAttribute("aria-pressed", String(ui.mode === "discard"));
+  if (elements.action) elements.action.textContent = "JUGAR CARTA ➔";
+  if (elements.discardButton) elements.discardButton.textContent = `DESCARTAR (${state.discardsRemaining}) ➔`;
+
   const hasSelection = ui.selectedIds.size > 0;
   const discardOpen = state.phase === "playing" && state.round.playerPlayedCount === 0 && state.discardsRemaining > 0;
-  elements.action.disabled = state.phase !== "playing" || !hasSelection
-    || (ui.mode === "discard" && !discardOpen);
-  elements.playMode.disabled = state.phase !== "playing";
-  elements.discardMode.disabled = !discardOpen;
+  
+  if (elements.action) {
+    elements.action.disabled = state.phase !== "playing" || ui.selectedIds.size !== 1;
+  }
+  if (elements.discardButton) {
+    elements.discardButton.disabled = !discardOpen || !hasSelection;
+  }
+  if (elements.playMode) elements.playMode.disabled = state.phase !== "playing";
+  if (elements.discardMode) elements.discardMode.disabled = !discardOpen;
   elements.next.classList.toggle("is-visible", state.phase === "roundEnded");
   elements.next.disabled = state.phase !== "roundEnded";
   elements.cantoResponse.hidden = state.phase !== "respondCanto";
@@ -456,7 +522,7 @@ export function renderGame(elements, state, ui) {
     ));
   }
   elements.note.textContent = state.phase === "playing"
-    ? ui.mode === "play" ? "Elegí una carta y jugala para continuar." : `Elegí cartas para cambiarlas; quedan ${state.discardsRemaining} cambios.`
+    ? "Seleccioná 1 carta para jugarla, o de 1 a 3 para descartar."
     : state.phase === "respondCanto" ? "El Rival espera tu respuesta."
       : state.phase === "roundEnded" ? "La ronda terminó. Avanzá para continuar el nivel."
         : state.phase === "shop" ? "Revisá la tienda; podés comprar las ofertas aprobadas."

@@ -4,7 +4,7 @@ chcp 65001 >nul
 cls
 
 echo ========================================================
-echo              TRUCOLITE - JUEGO LOCAL
+echo               🃏 TRUCOLITE — ROGUELIKE 🃏
 echo ========================================================
 echo.
 echo Iniciando el juego de forma local y 100%% offline...

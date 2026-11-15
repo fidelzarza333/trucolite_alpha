@@ -213,7 +213,7 @@ function trickUsesSuit(trick, suit) {
   return trick.playerCard && trick.playerCard.suit === suit;
 }
 
-function getRoundEffects(state) {
+export function getRoundEffects(state) {
   const effects = [];
   const cards = playedPlayerCards(state.round);
   let moneyEarned = 0;
@@ -237,11 +237,38 @@ function getRoundEffects(state) {
       for (const trick of state.round.tricks) {
         if (!trick.playerCard || !trick.rivalCard) continue;
         if (trick.winner === "player" && suits.includes(trick.playerCard.suit)) {
-          effects.push({ stage: "mult", op: "add", value: 1 });
+          effects.push({ stage: "mult", op: "add", value: joker.effect.multValue || 2 });
         }
         if (trick.winner === "rival" && suits.includes(trick.rivalCard.suit)) {
-          moneyEarned += joker.effect.value || 2;
+          moneyEarned += joker.effect.value || 3;
         }
+      }
+      continue;
+    }
+
+    if (joker.trigger && joker.trigger.type === "CARD_SUIT_PLAYED") {
+      const matchCount = cards.filter((c) => c.suit === joker.trigger.suit).length;
+      for (let k = 0; k < matchCount; k += 1) {
+        if (joker.effect.stage === "money") moneyEarned += joker.effect.value;
+        else effects.push(joker.effect);
+      }
+      continue;
+    }
+
+    if (joker.trigger && joker.trigger.type === "CARD_RANK_PLAYED") {
+      const matchCount = cards.filter((c) => c.rank === joker.trigger.rank).length;
+      for (let k = 0; k < matchCount; k += 1) {
+        if (joker.effect.stage === "money") moneyEarned += joker.effect.value;
+        else effects.push(joker.effect);
+      }
+      continue;
+    }
+
+    if (joker.trigger && joker.trigger.type === "CARD_SUITS_PLAYED") {
+      const matchCount = cards.filter((c) => joker.trigger.suits.includes(c.suit)).length;
+      for (let k = 0; k < matchCount; k += 1) {
+        if (joker.effect.stage === "money") moneyEarned += joker.effect.value;
+        else effects.push(joker.effect);
       }
       continue;
     }
@@ -341,10 +368,11 @@ function rejectCanto(state, canto, events) {
 
 function rejectRivalCanto(state, canto, events) {
   const reward = state.rules.cantos[canto].rejectReward;
-  const lossEnvido = state.round.envido === "lost" ? state.rules.cantos.envido.lossPenalty : 0;
-  const lossFlor = state.round.flor === "lost" ? state.rules.cantos.flor.lossPenalty : 0;
+  const lossEnvido = 0;
+  const lossFlor = 0;
   state.roundsCompleted += 1;
-  state.score = Math.max(0, state.score - reward - lossEnvido - lossFlor);
+  // Feedback de testers: perder o rechazar no resta puntos
+  state.score = state.score;
   state.phase = "roundEnded";
   events.push(event("ROUND_RESOLVED", {
     winner: "rival",
@@ -504,14 +532,17 @@ function callCanto(state, action) {
     next.round.envido = playerWins ? "won" : "lost";
     next.round.lastPlayerEnvidoTanto = playerTanto;
     if (playerWins) {
+      next.money += 1;
       next.round.playerCantos.push(canto);
       for (let j = 0; j < next.jokers.length; j += 1) {
         if (next.jokers[j].trigger && next.jokers[j].trigger.type === "SCALING_CANTO_WINS") {
-          next.jokers[j].accumulatedChips = (next.jokers[j].accumulatedChips || 0) + 2;
+          next.jokers[j].accumulatedChips = (next.jokers[j].accumulatedChips || 0) + (next.jokers[j].effect.value || 5);
         }
       }
+    } else {
+      next.money = Math.max(0, next.money - 1);
     }
-    events.push(event("ENVIDO_RESOLVED", { playerTanto, rivalTanto, winner: playerWins ? "player" : "rival" }));
+    events.push(event("ENVIDO_RESOLVED", { playerTanto, rivalTanto, winner: playerWins ? "player" : "rival", moneyDelta: playerWins ? 1 : -1 }));
     // Si El Rival es el líder y aún no jugó su carta, la juega tras resolver el canto
     if (next.round.leader === "rival" && next.round.table.rivalCard === null) {
       playRivalCard(next, events);
@@ -526,14 +557,17 @@ function callCanto(state, action) {
       || (playerTanto === rivalTanto && next.mano === "player");
     next.round.flor = playerWins ? "won" : "lost";
     if (playerWins) {
+      next.money += 1;
       next.round.playerCantos.push(canto);
       for (let j = 0; j < next.jokers.length; j += 1) {
         if (next.jokers[j].trigger && next.jokers[j].trigger.type === "SCALING_CANTO_WINS") {
-          next.jokers[j].accumulatedChips = (next.jokers[j].accumulatedChips || 0) + 2;
+          next.jokers[j].accumulatedChips = (next.jokers[j].accumulatedChips || 0) + (next.jokers[j].effect.value || 5);
         }
       }
+    } else {
+      next.money = Math.max(0, next.money - 1);
     }
-    events.push(event("FLOR_RESOLVED", { playerTanto, rivalTanto, rivalHasFlor, winner: playerWins ? "player" : "rival" }));
+    events.push(event("FLOR_RESOLVED", { playerTanto, rivalTanto, rivalHasFlor, winner: playerWins ? "player" : "rival", moneyDelta: playerWins ? 1 : -1 }));
     // Si El Rival es el líder y aún no jugó su carta, la juega tras resolver el canto
     if (next.round.leader === "rival" && next.round.table.rivalCard === null) {
       playRivalCard(next, events);
@@ -683,6 +717,22 @@ export function dispatch(state, action) {
   if (action.type === "ANSWER_CANTO") return answerCanto(state, action);
   if (action.type === "BUY_ITEM") return buyItem(state, action);
   if (action.type === "SELL_JOKER") return sellJoker(state, action);
+  if (action.type === "MOVE_JOKER") {
+    const { fromIndex, toIndex } = action;
+    if (typeof fromIndex !== "number" || typeof toIndex !== "number") return error(state, "INVALID_JOKER_INDEX");
+    if (fromIndex < 0 || fromIndex >= state.jokers.length || toIndex < 0 || toIndex >= state.jokers.length) {
+      return error(state, "INVALID_JOKER_INDEX");
+    }
+    const next = copyState(state);
+    const itemA = next.jokers[fromIndex];
+    const itemB = next.jokers[toIndex];
+    next.jokers[fromIndex] = itemB;
+    next.jokers[toIndex] = itemA;
+    return {
+      state: next,
+      events: [event("JOKER_MOVED", { fromIndex, toIndex, joker: itemA.name })]
+    };
+  }
   if (action.type === "REROLL_SHOP") {
     if (state.phase !== "shop") return error(state, "WRONG_PHASE");
     const REROLL_COST = 5;

@@ -43,15 +43,16 @@ test("card tooltip totals matching upgrades and suit/rank joker effects", () => 
   };
   assert.deepEqual(cardModifierSummary(card, state), [
     "Fuerza de baza: 4 (no suma directamente al puntaje)",
+    "Puntaje real = 4 + 18 chips + 2 mult",
     "Puntaje base: +3 fichas por baza ganada (suman si ganás la ronda)",
-    "Modificador: +5 fichas (si ganás la ronda)",
-    "Modificador: +0.25 al multiplicador",
-    "Dinero: +$3 al resolver la ronda, aunque la pierdas",
-    "Mejora Brillo de cobre: La carta marcada suma +2 fichas cuando la jugás.",
-    "Mejora Tinta de canto: La carta marcada suma +0,25 al multiplicador cuando la jugás.",
-    "Mejora Cara acuñada: Ganás +$1 cada vez que jugás la carta marcada.",
-    "Comodín Bastonero: Si jugás una carta de bastos, suma +3 fichas a la ronda.",
-    "Comodín Mercader de bastos: Si jugás una carta de bastos, ganás +$2."
+    "Modificador: +18 fichas (si ganás la ronda)",
+    "Modificador: +2 al multiplicador",
+    "Dinero: +$5 al resolver la ronda, aunque la pierdas",
+    "Mejora Brillo de cobre: La carta marcada suma +8 fichas cuando la jugás.",
+    "Mejora Tinta de canto: La carta marcada suma +2 al multiplicador cuando la jugás.",
+    "Mejora Cara acuñada: Ganás +$2 cada vez que jugás la carta marcada.",
+    "Comodín Bastonero: Por cada carta de bastos jugada, suma +10 fichas a la ronda.",
+    "Comodín Mercader de bastos: Por cada carta de bastos jugada, ganás +$3 al instante."
   ]);
 });
 
@@ -284,9 +285,9 @@ test("scoring formulas, penalties, rejects, and joker effect pipeline", () => {
   let lost = base({ ...baseRound, trucoLevel: 2 }, [], "rival");
   assert.equal(lost.score, 0);
   const score20 = scoreRound({ rules, round: { ...baseRound, trucoLevel: 2 }, mano: "player", score: 20, winner: "rival" }, []);
-  assert.equal(score20.score, 14);
+  assert.equal(score20.score, 20);
   const score4 = scoreRound({ rules, round: { ...baseRound, trucoLevel: 2 }, mano: "player", score: 4, winner: "rival" }, []);
-  assert.equal(score4.score, 0);
+  assert.equal(score4.score, 4);
   const lostEnvido = scoreRound({
     rules,
     round: { ...baseRound, envido: "lost" },
@@ -294,8 +295,8 @@ test("scoring formulas, penalties, rejects, and joker effect pipeline", () => {
     score: 0,
     winner: "player"
   }, []);
-  assert.equal(lostEnvido.score, 4);
-  assert.equal(lostEnvido.lossEnvido, 2);
+  assert.equal(lostEnvido.score, 6);
+  assert.equal(lostEnvido.lossEnvido, 0);
   const effects = [
     { stage: "chips", op: "add", value: 4 },
     { stage: "mult", op: "add", value: 2 },
@@ -515,7 +516,7 @@ test("approved item purchase and card/joker triggers feed scoring and money", ()
     { ...trick("player", "player"), playerCard: { id: "6-oros", rank: 6, suit: "oros" }, rivalCard: { id: "5-espadas", rank: 5, suit: "espadas" } }
   ];
   result = dispatch(state, { type: "PLAY_CARD", id: "7-bastos" });
-  assert.equal(result.state.score, 46);
+  assert.equal(result.state.score, 72);
   assert.equal(result.state.money, 7);
   assert.equal(result.events.find((item) => item.type === "ROUND_RESOLVED").moneyEarned, 2);
 });
@@ -540,4 +541,39 @@ test("a bot-like complete level resolves without errors in fewer than 200 action
   }
   assert.ok(["shop", "lost"].includes(state.phase));
   assert.ok(actions < 200);
+});
+
+test("MOVE_JOKER allows reordering jokers and envido/flor grants money", () => {
+  const game = createGame(undefined, 100);
+  let state = game.state;
+  state.jokers = [
+    { id: "joker-1", name: "Joker A" },
+    { id: "joker-2", name: "Joker B" },
+    { id: "joker-3", name: "Joker C" }
+  ];
+  let res = dispatch(state, { type: "MOVE_JOKER", fromIndex: 0, toIndex: 1 });
+  assert.equal(res.state.jokers[0].id, "joker-2");
+  assert.equal(res.state.jokers[1].id, "joker-1");
+  assert.equal(res.state.jokers[2].id, "joker-3");
+
+  // Invalid indices guarded
+  let errRes = dispatch(state, { type: "MOVE_JOKER", fromIndex: -1, toIndex: 1 });
+  assert.equal(errRes.events[0].type, "ERROR");
+
+  // Money reward for envido
+  state.money = 2;
+  state.round.playerPlayedCount = 0;
+  state.playerHand = [
+    { id: "7-espadas", rank: 7, suit: "espadas" },
+    { id: "6-espadas", rank: 6, suit: "espadas" },
+    { id: "1-copas", rank: 1, suit: "copas" }
+  ];
+  state.round.rivalDealt = [
+    { id: "4-bastos", rank: 4, suit: "bastos" },
+    { id: "5-oros", rank: 5, suit: "oros" },
+    { id: "2-copas", rank: 2, suit: "copas" }
+  ];
+  let envidoRes = dispatch(state, { type: "CANTAR", canto: "envido" });
+  assert.equal(envidoRes.state.round.envido, "won");
+  assert.equal(envidoRes.state.money, 3); // earned $1
 });

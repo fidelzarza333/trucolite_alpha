@@ -15,6 +15,7 @@ Se simularon 5000 niveles por bot, usando seeds 1–5000 y `tools/simulate.mjs`.
 - Rondas disponibles por nivel: 4.
 - Premio por nivel: $5.
 - Precios por rareza: $2 / $4 / $7 / $10.
-- Peso de rareza por oferta: 70% / 20% / 8% / 2%.
-
-Los criterios se conservan como referencia para una sola meta: smart entre 35% y 65%, always no supera smart, never al menos 10%. En esta simulación, los tres se cumplen para un nivel. La probabilidad de completar una run de varios niveles todavía no está medida; requiere aprobar objetos y balancear la economía/progresión.
+- Peso de rareza por oferta: 60% / 25% / 11% / 4% (aumento de frecuencia para rarezas mayores).
+- **Sistema de combate**: Perder rondas o cantos ya no quita puntos acumulados al jugador, reduciendo la penalización por riesgo.
+- **Utilidad de Flor y Envido**: Cantar y ganar Envido o Flor premia con +$1 a la economía del jugador (-$1 si pierde).
+- **Rebalanceo de Comodines (Jokers)**: Se multiplicó el impacto numérico de todos los comodines (+10 a +25 fichas, +3 a +8 mult) y se potenció la escala progresiva (Tarjeta SUBE +5 fichas/canto, Pecador +1,0 mult/rey descartado).
