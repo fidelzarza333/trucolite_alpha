@@ -775,21 +775,32 @@
     .jokers-grid {
       display: flex;
       justify-content: center;
-      align-items: center;
-      gap: 10px;
+      align-items: flex-start;
+      gap: 8px;
       width: 100%;
       flex-wrap: wrap;
     }
 
-    /* Vertical Balatro-Style Joker Card */
+    /* Slot unit container holding the card and external buttons underneath */
+    .joker-slot-unit {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      width: clamp(64px, 8vw, 88px);
+      box-sizing: border-box;
+    }
+
+    /* Vertical Balatro-Style Joker Card (Identical dimensions to .playing-card) */
     .joker-card {
       position: relative;
       background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
       border: 2px solid var(--border);
-      border-radius: 8px;
-      padding: 4px;
-      width: clamp(62px, 7.5vw, 82px);
-      aspect-ratio: 0.64;
+      border-radius: 6px;
+      padding: 3px;
+      width: 100%;
+      aspect-ratio: 0.66;
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -834,13 +845,56 @@
     .joker-header {
       display: flex; justify-content: space-between; align-items: center;
       position: relative; z-index: 1;
+      width: 100%;
+      padding: 0 1px;
     }
     .joker-rarity-badge {
-      font-size: 8px; font-weight: 700; color: var(--text-dim);
-      letter-spacing: 0.05em;
+      font-size: 7.5px; font-weight: 700; color: var(--text-dim);
+      letter-spacing: 0.04em;
     }
 
+    .joker-controls-outside {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .joker-controls-placeholder {
+      height: 36px;
+      width: 100%;
+      visibility: hidden;
+    }
+
+    /* Vertical Empty Slot */
+    .joker-slot-empty {
+      border: 2px dashed rgba(255, 255, 255, 0.18);
+      border-radius: 6px;
+      width: 100%;
+      aspect-ratio: 0.66;
+      box-sizing: border-box;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(0, 0, 0, 0.22);
+      color: #64748b;
+      gap: 2px;
+      transition: border-color 0.15s ease;
+    }
+    .empty-slot-plus { font-size: 16px; font-weight: 700; color: #475569; }
+    .empty-slot-label { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; }
+    .empty-slot-sub { font-size: 8px; opacity: 0.6; }
+
     /* Center Placeholder Block showing joker name text */
+    .joker-art-emoji {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      font-size: 48px;
+      line-height: 1;
+      text-align: center;
+      user-select: none;
+    }
     .joker-placeholder-body {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       text-align: center; margin: 2px 0;
@@ -878,29 +932,12 @@
       overflow: hidden;
     }
     .button-sell {
-      min-height: 20px; padding: 2px 4px; font-size: 8px;
-      background: rgba(254, 67, 101, 0.15); border: 1px solid rgba(254, 67, 101, 0.4);
+      min-height: 18px; padding: 1px 3px; font-size: 8px; font-weight: 700;
+      background: rgba(254, 67, 101, 0.18); border: 1px solid rgba(254, 67, 101, 0.45);
       color: #ffbe76; align-self: stretch; border-radius: 3px;
-      text-align: center;
+      text-align: center; cursor: pointer; line-height: 1.2;
     }
     .button-sell:hover { background: var(--red); color: #fff; }
-
-    /* Vertical Empty Slot */
-    .joker-slot-empty {
-      border: 2px dashed rgba(255, 255, 255, 0.18);
-      border-radius: 8px;
-      width: clamp(62px, 7.5vw, 82px);
-      aspect-ratio: 0.64;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      background: rgba(0, 0, 0, 0.22);
-      color: #64748b;
-      gap: 2px;
-      transition: border-color 0.15s ease;
-    }
-    .empty-slot-plus { font-size: 16px; font-weight: 700; color: #475569; }
-    .empty-slot-label { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; }
-    .empty-slot-sub { font-size: 8px; opacity: 0.6; }
 
     /* ========================================================
        CENTER SECTION: OPPONENT & BAZAS TABLE
@@ -1423,63 +1460,75 @@
     .shop-table-view {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      align-items: stretch;
+      justify-content: flex-start;
       flex: 1;
-      padding: 6px;
+      height: 100%;
+      width: 100%;
+      padding: 4px;
+      box-sizing: border-box;
+      overflow: hidden;
     }
     .shop-felt-container {
-      background: rgba(18, 25, 34, 0.95);
+      background: rgba(14, 20, 28, 0.96);
       border: 3px solid #334454;
-      border-radius: 14px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), inset 0 0 20px rgba(0, 0, 0, 0.5);
-      padding: 16px 20px;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), inset 0 0 16px rgba(0, 0, 0, 0.5);
+      padding: 10px 14px;
       width: 100%;
-      max-width: 940px;
+      height: 100%;
+      max-width: 100%;
+      flex: 1;
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      animation: shop-appear 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+      gap: 8px;
+      overflow-y: auto;
+      animation: shop-appear 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
     @keyframes shop-appear {
-      0% { opacity: 0; transform: scale(0.95) translateY(14px); filter: blur(4px); }
+      0% { opacity: 0; transform: scale(0.96) translateY(10px); filter: blur(3px); }
       100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
     }
 
     .shop-marquee-banner {
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
+      justify-content: space-between;
       align-items: center;
-      justify-content: center;
-      padding: 8px 24px;
+      padding: 4px 16px;
       background: #10151c;
-      border: 3px solid #ff7675;
-      border-radius: 10px;
-      box-shadow: 0 0 18px rgba(235, 77, 75, 0.4), inset 0 0 12px rgba(235, 77, 75, 0.2);
-      align-self: flex-start;
+      border: 2px solid #ff7675;
+      border-radius: 8px;
+      box-shadow: 0 0 14px rgba(235, 77, 75, 0.35), inset 0 0 10px rgba(235, 77, 75, 0.2);
+      width: 100%;
+      box-sizing: border-box;
+      flex-shrink: 0;
     }
     .shop-marquee-title {
       font-family: var(--font-ui);
-      font-size: 26px;
+      font-size: 20px;
       font-weight: 700;
       color: #feca57;
-      text-shadow: 0 0 10px #feca57, 0 0 22px rgba(254, 202, 87, 0.6), 2px 2px 0 #000;
+      text-shadow: 0 0 10px #feca57, 0 0 20px rgba(254, 202, 87, 0.6), 2px 2px 0 #000;
       letter-spacing: 0.12em;
       line-height: 1;
     }
     .shop-marquee-sub {
       font-family: var(--font-small);
-      font-size: 9px;
+      font-size: 11px;
       color: #dfe6e9;
-      letter-spacing: 0.2em;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
-      margin-top: 3px;
+      margin: 0;
     }
     .shop-layout-grid {
       display: flex;
-      gap: 16px;
+      gap: 12px;
       align-items: stretch;
       width: 100%;
+      flex: 1;
+      min-height: 0;
     }
     @media (max-width: 768px) {
       .shop-layout-grid { flex-direction: column; }
@@ -1487,125 +1536,328 @@
     .shop-sidebar-controls {
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      width: 140px;
-      shrink: 0;
+      gap: 8px;
+      width: 130px;
+      flex-shrink: 0;
+      justify-content: flex-start;
     }
     .shop-next-btn {
       background: #eb4d4b;
       border: 3px solid #ff7675;
-      box-shadow: 0 6px 0 0 #c0392b;
+      box-shadow: 0 4px 0 0 #c0392b;
       color: #ffffff;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
-      padding: 14px 8px;
+      padding: 8px;
       border-radius: 8px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 2px;
-      line-height: 1.2;
-      flex: 1;
-      min-height: 75px;
       justify-content: center;
+      gap: 2px;
+      line-height: 1.15;
+      min-height: 52px;
+      height: 52px;
+    }
+    .shop-next-btn:hover {
+      background: #ff5252;
+      transform: translateY(-2px);
+    }
+    .shop-next-btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 0 #c0392b;
     }
     .shop-reroll-btn {
       background: #10ac84;
       border: 3px solid #55efc4;
-      box-shadow: 0 6px 0 0 #0e8062;
+      box-shadow: 0 4px 0 0 #0e8062;
       color: #ffffff;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
-      padding: 12px 8px;
+      padding: 6px 8px;
       border-radius: 8px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 2px;
-      line-height: 1.2;
+      justify-content: center;
+      gap: 1px;
+      line-height: 1.15;
+      min-height: 48px;
+      height: 48px;
+    }
+    .shop-reroll-btn:hover:not(:disabled) {
+      background: #1dd1a1;
+      transform: translateY(-2px);
+    }
+    .shop-reroll-btn:active:not(:disabled) {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 0 #0e8062;
+    }
+    .shop-reroll-btn:disabled {
+      opacity: 0.45;
+      filter: grayscale(0.6);
+      cursor: not-allowed;
     }
     .shop-reroll-price {
       color: #feca57;
-      font-size: 16px;
+      font-size: 13px;
       font-weight: 700;
     }
+    /* Main Area: Two Stacked Sections Occupying Full Available Height */
     .shop-offers-container {
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      justify-content: space-between;
+      gap: clamp(6px, 1.2vh, 12px);
+      min-height: 0;
+      min-width: 0;
+      padding-right: clamp(10px, 4vw, 55px);
+      padding-bottom: clamp(6px, 1.2vh, 14px);
+      box-sizing: border-box;
     }
-    .shop-offers-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
+    .shop-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 0;
+      gap: clamp(3px, 0.6vh, 6px);
+      position: relative;
+    }
+    .shop-section-label {
+      font-family: var(--font-small);
+      font-size: clamp(12px, 1.3vh, 13px);
+      font-weight: 700;
+      color: #55efc4;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      text-align: left;
+      margin: 0;
+      padding: 0 4px;
+      flex-shrink: 0;
+    }
+    .shop-section-divider {
       width: 100%;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.12);
+      flex-shrink: 0;
+      margin: 1px 0;
     }
-    @media (max-width: 680px) {
-      .shop-offers-grid { grid-template-columns: 1fr; }
+    .shop-cards-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: clamp(14px, 2vw, 24px);
+      flex-wrap: nowrap;
+      width: 100%;
+      flex: 1;
+      min-height: 0;
     }
     .shop-offer-wrapper {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 4px;
-    }
-    .shop-price-tag {
-      background: #1e272e;
-      border: 2px solid #485460;
-      border-radius: 6px;
-      padding: 2px 10px;
-      font-family: var(--font-ui);
-      font-size: 13px;
-      font-weight: 700;
-      color: #feca57;
-      text-shadow: 1px 1px 0 #000;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+      height: 100%;
+      max-height: 100%;
+      min-height: 0;
+      width: clamp(140px, 12.5vw, 185px);
+      flex-shrink: 0;
+      gap: clamp(3px, 0.6vh, 6px);
+      box-sizing: border-box;
     }
     .shop-item-card {
-      background: linear-gradient(135deg, #1b2631 0%, #10161b 100%);
-      border: 2px solid var(--border);
+      background: linear-gradient(180deg, #18222d 0%, #0d1217 100%);
+      border: 2px solid var(--card-border, #334454);
       border-radius: 8px;
-      padding: 10px;
+      padding: clamp(6px, 1vh, 8px) clamp(8px, 1vw, 10px);
       width: 100%;
-      min-height: 185px;
+      box-sizing: border-box;
+      aspect-ratio: 58 / 90;
+      flex: 1;
+      min-height: 0;
       display: flex;
       flex-direction: column;
+      align-items: center;
       justify-content: space-between;
-      gap: 6px;
       position: relative;
       overflow: hidden;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      cursor: default;
     }
-    .shop-card-comun { border-color: var(--blue); }
-    .shop-card-pocoComun { border-color: var(--green); }
-    .shop-card-raro { border-color: var(--red); }
-    .shop-card-legendario { border-color: var(--yellow); }
-    .shop-rarity { font-family: var(--font-small); font-size: 9px; text-transform: uppercase; color: var(--text-dim); }
-    .shop-item-title { margin: 0; font-family: var(--font-ui); font-size: 13px; color: #fff; }
-    .shop-description { font-family: var(--font-small); font-size: 10px; color: var(--text-dim); line-height: 1.3; margin: 0; }
-    .shop-card-select {
-      width: 100%;
-      background: #0c0f13;
-      border: 2px solid var(--border);
-      border-radius: 4px;
-      color: #fff;
-      padding: 5px;
+    .shop-offer-wrapper:hover .shop-item-card,
+    .shop-item-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7), 0 0 14px var(--card-glow, rgba(255, 255, 255, 0.3));
+    }
+    .shop-card-comun {
+      --card-border: var(--blue);
+      --card-glow: rgba(0, 168, 255, 0.55);
+      --card-rarity-color: var(--blue);
+    }
+    .shop-card-pocoComun {
+      --card-border: var(--green);
+      --card-glow: rgba(16, 172, 132, 0.55);
+      --card-rarity-color: #2ed573;
+    }
+    .shop-card-raro {
+      --card-border: var(--red);
+      --card-glow: rgba(235, 77, 75, 0.55);
+      --card-rarity-color: #ff6b6b;
+    }
+    .shop-card-legendario {
+      --card-border: var(--yellow);
+      --card-glow: rgba(254, 202, 87, 0.6);
+      --card-rarity-color: #feca57;
+    }
+    .shop-rarity {
       font-family: var(--font-small);
-      font-size: 10px;
+      font-size: clamp(12px, 1.25vh, 12.5px);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--card-rarity-color, var(--text-dim));
+      text-align: center;
+      line-height: 1.1;
+      flex-shrink: 0;
+      margin: 0;
+    }
+    .shop-item-card .joker-art-container {
+      width: 100%;
+      height: 48%;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: clamp(2px, 0.4vh, 4px) 0;
+      background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.06) 0%, rgba(0, 0, 0, 0.45) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+    }
+    .shop-item-card .joker-art-emoji {
+      font-size: clamp(34px, 4.8vh, 46px);
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.7));
+      user-select: none;
+    }
+    .shop-item-title {
+      margin: clamp(1px, 0.3vh, 3px) 0;
+      font-family: var(--font-ui);
+      font-size: clamp(14px, 1.7vh, 16px);
+      font-weight: 700;
+      color: #ffffff;
+      text-align: center;
+      line-height: 1.15;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+      flex-shrink: 0;
+      width: 100%;
+      word-break: break-word;
+    }
+    .shop-description {
+      font-family: var(--font-small);
+      font-size: clamp(12px, 1.35vh, 13px);
+      color: #dcdde1;
+      line-height: 1.25;
+      margin: 0;
+      text-align: center;
+      flex-shrink: 0;
+      width: 100%;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
     .shop-buy-btn {
       width: 100%;
-      padding: 8px 10px;
+      padding: clamp(4px, 0.8vh, 7px) clamp(6px, 1vw, 10px);
+      min-height: clamp(28px, 3.8vh, 34px);
+      border-radius: 6px;
+      font-family: var(--font-ui);
+      font-size: clamp(12px, 1.35vh, 13px);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-sizing: border-box;
+      flex-shrink: 0;
+      cursor: pointer;
+      text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.7);
+      background: #0f6f56;
+      border: 2px solid #10ac84;
+      box-shadow: 0 3px 0 0 #0a4b3a;
+      color: #ffffff;
+      transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .shop-buy-btn .shop-buy-price {
+      color: #ffffff;
+      font-weight: 700;
+    }
+    .shop-buy-btn:hover:not(:disabled) {
+      background: #10ac84;
+      border-color: #55efc4;
+      color: #ffffff;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 0 0 #0a4b3a, 0 0 10px rgba(85, 239, 196, 0.4);
+    }
+    .shop-buy-btn:active:not(:disabled) {
+      transform: translateY(1px);
+      box-shadow: 0 1px 0 0 #0a4b3a;
+    }
+    .shop-buy-btn:disabled {
+      background: #1c242c;
+      border-color: #384656;
+      box-shadow: none;
+      color: #7f8c8d;
+      cursor: not-allowed;
+      opacity: 0.75;
+      transform: none;
+    }
+    .shop-buy-btn.is-insufficient .shop-buy-price,
+    .shop-buy-btn:disabled.is-insufficient .shop-buy-price {
+      color: #ff5252 !important;
+      text-shadow: 0 0 4px rgba(255, 82, 82, 0.5);
+    }
+    .shop-offer-wrapper.is-sold .shop-item-card,
+    .shop-item-card.is-sold {
+      opacity: 0.35;
+      filter: grayscale(0.85);
+      pointer-events: none;
+    }
+    .shop-offer-wrapper.is-sold .shop-buy-btn,
+    .shop-buy-btn.is-sold {
+      opacity: 0.45;
+      background: #182028;
+      border-color: #2f3b47;
+      color: #718093;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .shop-empty-msg {
+      font-family: var(--font-small);
       font-size: 12px;
+      color: var(--text-dim);
+      font-style: italic;
+      text-align: center;
+      padding: 10px;
     }
     .shop-status-note {
       font-family: var(--font-small);
-      font-size: 11px;
+      font-size: clamp(12px, 1.25vh, 12px);
       color: var(--text-dim);
       text-align: center;
       border-top: 1px solid rgba(255, 255, 255, 0.1);
-      padding-top: 8px;
+      padding-top: 3px;
+      margin: 0;
+      flex-shrink: 0;
     }
 
     /* ========================================================
@@ -1722,6 +1974,18 @@
     }
     .deck-card-item.is-played .deck-card-status {
       color: #64748b;
+    }
+    .deck-card-item.deck-card-upgrade-target {
+      cursor: pointer !important;
+      border: 2px solid #55efc4 !important;
+      box-shadow: 0 0 8px rgba(85, 239, 196, 0.35) !important;
+      transition: transform 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.18s ease !important;
+    }
+    .deck-card-item.deck-card-upgrade-target:hover {
+      transform: scale(1.15) translateY(-5px) !important;
+      border-color: #feca57 !important;
+      box-shadow: 0 0 20px rgba(254, 202, 87, 0.95), 0 8px 20px rgba(0, 0, 0, 0.85) !important;
+      z-index: 50 !important;
     }
     .deck-tier-sep {
       grid-column: 1 / -1;
@@ -1960,7 +2224,7 @@
         </button>
         <div class="intro-sub-buttons">
           <button id="introInteractiveTourBtn" class="arcade-btn button button-primary" type="button" style="color: #1a1700;">
-            🎓 JUGAR TUTORIAL
+            JUGAR TUTORIAL
           </button>
           <button id="introTutorialBtn" class="arcade-btn button button-quiet" type="button">
             REGLAS
@@ -1969,8 +2233,9 @@
             VER MAZO
           </button>
           <button id="introLeaderboardBtn" class="arcade-btn button button-quiet" type="button">
-            🏆 RÉCORDS
+            RÉCORDS
           </button>
+          <button id="introCreditsBtn" class="arcade-btn button button-quiet" type="button">CRÉDITOS</button>
         </div>
       </div>
     </div>
@@ -2065,18 +2330,20 @@
             <span id="bgmZoneBadge" class="audio-status-badge">● MÚSICA</span>
           </div>
           <div class="audio-controls-row">
-            <button class="arcade-btn audio-btn" id="bgmToggle" type="button"><span>⏸</span> PAUSAR</button>
+            <button class="arcade-btn audio-btn" id="bgmToggle" type="button">PAUSAR</button>
             <input type="range" class="audio-slider" id="bgmVolume" min="0" max="100" value="35" title="Volumen de música">
           </div>
         </div>
 
         <!-- Sidebar Utility Buttons -->
         <div class="sidebar-actions-grid">
-          <button class="button button-quiet arcade-btn" id="returnToMenuBtn" type="button" style="color: #feca57; font-weight: 700;">🏠 MENÚ</button>
+          <button class="button button-quiet arcade-btn" id="returnToMenuBtn" type="button" style="color: #feca57; font-weight: 700;">MENÚ</button>
           <button class="button button-quiet arcade-btn" id="tutorialOpenButton" type="button">CÓMO JUGAR</button>
-          <button class="button button-quiet arcade-btn" id="openLeaderboardButton" type="button">🏆 RÉCORDS</button>
+          <button class="button button-quiet arcade-btn" id="openLeaderboardButton" type="button">RÉCORDS</button>
           <button class="button button-quiet arcade-btn" id="toggleRulesButton" type="button">REGLAS</button>
-          <button class="button button-quiet arcade-btn" id="openSettingsButton" type="button">⚙ CONFIG</button>
+          <button class="button button-quiet arcade-btn" id="openSettingsButton" type="button">CONFIG</button>
+          <button class="button button-quiet arcade-btn" id="openCreditsButton" type="button">CRÉDITOS</button>
+          <button class="button button-quiet arcade-btn" id="openDebugButton" type="button" style="color: #ff9f43; font-weight: 700;">DEBUG</button>
           <button class="button button-quiet arcade-btn" id="restartButton" type="button" style="color: var(--red);">REINICIAR</button>
         </div>
       </div>
@@ -2124,21 +2391,14 @@
           <div class="round-outcome" id="roundOutcome" role="status" aria-live="polite" hidden>
             <strong id="roundOutcomeTitle"></strong>
             <span id="roundOutcomeDetails"></span>
+            <button class="button button-primary arcade-btn outcome-next-round-btn" id="outcomeNextRoundButton" type="button">
+              SIGUIENTE RONDA ➔
+            </button>
           </div>
         </section>
 
-        <!-- Cantos, Player Hand & Actions -->
+        <!-- Cantos, Barra de Acciones y Mano del Jugador -->
         <section class="bottom-section">
-          <!-- Canto Badges Bar -->
-          <div class="cantos-bar" aria-label="Cantos de Truco">
-            <button class="button button-canto arcade-btn" id="envidoButton" type="button" data-canto="envido" aria-pressed="false">ENVIDO</button>
-            <button class="button button-canto arcade-btn" id="florButton" type="button" data-canto="flor" aria-pressed="false">FLOR</button>
-            <div style="width: 1px; height: 24px; background: var(--border); margin: auto 2px;"></div>
-            <button class="button button-canto arcade-btn" id="trucoButton" type="button" data-canto="truco" aria-pressed="false">TRUCO</button>
-            <button class="button button-canto arcade-btn" id="retrucoButton" type="button" data-canto="retruco" aria-pressed="false">RETRUCO</button>
-            <button class="button button-canto arcade-btn" id="valeCuatroButton" type="button" data-canto="valeCuatro" aria-pressed="false">VALE CUATRO</button>
-          </div>
-
           <!-- Canto Response prompt from rival -->
           <div class="canto-response-bar" id="cantoResponse" hidden aria-label="Respuesta al canto del rival">
             <span id="cantoQuestion" style="font-size: 11px; font-weight: 700; color: #fff;"></span>
@@ -2146,11 +2406,15 @@
             <button class="button button-quiet arcade-btn" id="cantoRejectButton" type="button">NO QUIERO</button>
           </div>
 
-          <!-- Player Hand -->
-          <div class="player-cards-row" id="playerCards" aria-label="Tus cartas"></div>
-
-          <!-- Primary Action Buttons -->
-          <div class="primary-actions-row">
+          <!-- Barra de Acciones (Cantos + Jugar/Descartar/Tanto) -->
+          <div class="cantos-bar" aria-label="Acciones y Cantos de Truco">
+            <button class="button button-canto arcade-btn" id="envidoButton" type="button" data-canto="envido" aria-pressed="false">ENVIDO</button>
+            <button class="button button-canto arcade-btn" id="florButton" type="button" data-canto="flor" aria-pressed="false">FLOR</button>
+            <div class="canto-sep"></div>
+            <button class="button button-canto arcade-btn" id="trucoButton" type="button" data-canto="truco" aria-pressed="false">TRUCO</button>
+            <button class="button button-canto arcade-btn" id="retrucoButton" type="button" data-canto="retruco" aria-pressed="false">RETRUCO</button>
+            <button class="button button-canto arcade-btn" id="valeCuatroButton" type="button" data-canto="valeCuatro" aria-pressed="false">VALE CUATRO</button>
+            <div class="canto-sep"></div>
             <button class="button button-quiet arcade-btn" id="playModeButton" type="button" aria-pressed="true" style="display: none;">Modo Jugar</button>
             <button class="button button-quiet arcade-btn" id="discardModeButton" type="button" aria-pressed="false" style="display: none;">Modo Descartar</button>
             <button class="button btn-play-card arcade-btn" id="actionButton" type="button" disabled>JUGAR CARTA ➔</button>
@@ -2158,6 +2422,9 @@
             <button class="button btn-tanto arcade-btn" id="showTantoButton" type="button">VER TANTO</button>
             <button class="button button-primary arcade-btn button-next" id="nextRoundButton" type="button">SIGUIENTE RONDA ➔</button>
           </div>
+
+          <!-- Player Hand -->
+          <div class="player-cards-row" id="playerCards" aria-label="Tus cartas"></div>
 
           <div style="display: flex; justify-content: space-between; width: 100%; max-width: 600px; padding: 0 4px;">
             <span class="control-note" id="controlNote">Elegí una carta y jugala para abrir la baza.</span>
@@ -2190,11 +2457,26 @@
               </button>
             </div>
 
-            <!-- Right Offers Panel: Offers as Cards with Price Badges -->
+            <!-- Right Offers Panel: Two stacked vertical sections -->
             <div class="shop-offers-container">
-              <div class="shop-offers-grid" id="shopOffers">
-                <!-- Rendered dynamically via JS -->
-              </div>
+              <!-- Section 1: COMODINES -->
+              <section class="shop-section shop-jokers-section">
+                <div class="shop-section-label">COMODINES</div>
+                <div class="shop-cards-row" id="shopOffers">
+                  <!-- Rendered dynamically via JS -->
+                </div>
+              </section>
+
+              <!-- Fine divider between sections -->
+              <div class="shop-section-divider"></div>
+
+              <!-- Section 2: MEJORAS DE CARTA -->
+              <section class="shop-section shop-upgrades-section" id="shopUpgradesSection">
+                <div class="shop-section-label">MEJORAS DE CARTA</div>
+                <div class="shop-cards-row" id="shopUpgradesOffers">
+                  <!-- Rendered dynamically via JS -->
+                </div>
+              </section>
             </div>
           </div>
 
@@ -2241,7 +2523,7 @@
               CONTINUAR ➔
             </button>
             <button class="button button-primary arcade-btn outcome-btn outcome-btn-restart" id="outcomeRestartButton" type="button" hidden>
-              REINICIAR RUN (NUEVA SEED) 🔄
+              REINICIAR RUN (NUEVA SEED)
             </button>
           </div>
         </div>
@@ -2269,10 +2551,10 @@
       <div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
         <div style="display: flex; gap: 6px;">
           <button class="button arcade-btn button-primary" id="deckSortPowerBtn" type="button" aria-pressed="true" style="font-size: 11px; padding: 4px 10px; min-height: 28px;">
-            ⚔ FUERZA DE BAZA
+            FUERZA DE BAZA
           </button>
           <button class="button button-quiet arcade-btn" id="deckSortSuitBtn" type="button" aria-pressed="false" style="font-size: 11px; padding: 4px 10px; min-height: 28px;">
-            🎴 POR PALO
+            POR PALO
           </button>
         </div>
         <span style="font-size: 10px; color: var(--text-dim);" id="deckSortHint">14 rangos de Truco · De mayor a menor poder</span>
@@ -2347,10 +2629,10 @@
       <!-- Tabs Header -->
       <div style="display: flex; gap: 8px; margin: 10px 0 14px; border-bottom: 2px solid var(--border); padding-bottom: 8px;">
         <button class="button arcade-btn button-primary" id="tabTrucoBtn" type="button" aria-pressed="true" style="font-size: 11px; padding: 6px 12px; min-height: 32px;">
-          🃏 REGLAS DEL TRUCO
+          REGLAS DEL TRUCO
         </button>
         <button class="button button-quiet arcade-btn" id="tabRogueliteBtn" type="button" aria-pressed="false" style="font-size: 11px; padding: 6px 12px; min-height: 32px;">
-          ⚡ MODO TRUCOLITE
+          MODO TRUCOLITE
         </button>
       </div>
 
@@ -2548,6 +2830,63 @@
       <button id="tourNextBtn" class="button button-primary arcade-btn" type="button">SIGUIENTE ▶</button>
     </div>
   </div>
+
+  <dialog class="rules-dialog" id="creditsDialog" aria-labelledby="creditsTitle" style="max-width: 480px;">
+  <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border); padding-bottom: 10px;">
+      <h2 id="creditsTitle" style="margin: 0; font-family: var(--font-ui); font-size: 20px; color: #feca57;">🎮 TRUCOLITE — CRÉDITOS</h2>
+      <button class="button button-quiet arcade-btn" id="closeCreditsButton" type="button">CERRAR</button>
+    </div>
+    
+    <div style="display: flex; flex-direction: column; gap: 12px; max-height: 60vh; overflow-y: auto;">
+      <!-- Equipo -->
+      <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; margin-bottom: 4px;">
+          <div style="color: #feca57; font-weight: 700; font-family: var(--font-ui); font-size: 14px;">Fidel Zarza</div>
+          <div style="color: var(--text-dim); font-size: 11px; margin-top: 2px;">Coder · Compositor · SFX · Dirección General</div>
+        </div>
+        <div style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
+          <div style="color: #feca57; font-weight: 700; font-family: var(--font-ui); font-size: 14px;">Valentino Landi</div>
+          <div style="color: var(--text-dim); font-size: 11px; margin-top: 2px;">Testing</div>
+        </div>
+        <div style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
+          <div style="color: #feca57; font-weight: 700; font-family: var(--font-ui); font-size: 14px;">Valentín Sánchez</div>
+          <div style="color: var(--text-dim); font-size: 11px; margin-top: 2px;">Testing · Aportes Creativos</div>
+        </div>
+        <div>
+          <div style="color: #feca57; font-weight: 700; font-family: var(--font-ui); font-size: 14px;">Selene Villalba &amp; Paulina Marchese</div>
+          <div style="color: var(--text-dim); font-size: 11px; margin-top: 2px;">Arte / Diseño</div>
+        </div>
+      </div>
+      
+      <!-- Agradecimientos -->
+      <div style="background: rgba(16, 172, 132, 0.08); border: 1px solid rgba(16, 172, 132, 0.3); border-radius: 8px; padding: 12px;">
+        <div style="color: #10ac84; font-weight: 700; font-size: 12px; margin-bottom: 6px; letter-spacing: 0.08em;">🙏 AGRADECIMIENTOS ESPECIALES</div>
+        <div style="color: #dfe6e9; font-size: 11px; line-height: 1.6;">A la <strong style="color: #ffffff;">Escuela Chacabuco</strong> y sus profesores por darnos las herramientas para aprender a programar y hacer proyectos como estos.</div>
+      </div>
+      
+      <!-- Redes -->
+      <div style="background: rgba(0, 168, 255, 0.08); border: 1px solid rgba(0, 168, 255, 0.3); border-radius: 8px; padding: 12px;">
+        <div style="color: #00a8ff; font-weight: 700; font-size: 12px; margin-bottom: 8px; letter-spacing: 0.08em;">📱 REDES Y CONTACTO</div>
+        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 11px;">
+          <a href="https://www.instagram.com/crazybombst/" target="_blank" rel="noopener" style="color: #fd79a8; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+            🎨 <strong>Instagram:</strong> @crazybombst
+          </a>
+          <a href="mailto:crazybombstudio@gmail.com" style="color: #55efc4; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+            📧 <strong>Gmail:</strong> crazybombstudio@gmail.com
+          </a>
+          <span style="color: var(--text-dim); display: flex; align-items: center; gap: 6px;">
+            🎮 <strong style="color: #fff;">Itch.io:</strong> <span style="color: var(--text-dim);">Próximamente...</span>
+          </span>
+        </div>
+      </div>
+      
+      <div style="text-align: center; color: var(--text-dim); font-size: 10px; padding-top: 4px;">
+        Hecho con ❤️ en Argentina · Trucolite Alpha 2026
+      </div>
+    </div>
+  </div>
+</dialog>
 
 </body>
 </html>

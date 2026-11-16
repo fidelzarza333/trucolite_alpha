@@ -1,4 +1,4 @@
-import { createGame, dispatch, cantoAvailable } from "../core/game.js";
+import { createGame, dispatch, cantoAvailable, pickShopOffers } from "../core/game.js";
 import { createDeck, cardPower } from "../core/cards.js";
 import { ITEM_PRICES, itemById, FULL_CATALOG } from "../core/items.js";
 import { createDefaultRules, mergeRules, validateRules } from "../core/rules.js";
@@ -98,8 +98,17 @@ const elements = {
   shopMoney: document.querySelector("#shopMoney"),
   shopIntro: document.querySelector("#shopIntro"),
   shopOffers: document.querySelector("#shopOffers"),
+  shopUpgradesOffers: document.querySelector("#shopUpgradesOffers"),
+  shopUpgradesSection: document.querySelector("#shopUpgradesSection"),
   shopReroll: document.querySelector("#shopRerollButton"),
   nextLevel: document.querySelector("#nextLevelButton"),
+
+  // Credits & Debug
+  creditsDialog: document.querySelector("#creditsDialog"),
+  introCreditsBtn: document.querySelector("#introCreditsBtn"),
+  openCreditsButton: document.querySelector("#openCreditsButton"),
+  closeCreditsButton: document.querySelector("#closeCreditsButton"),
+  openDebugButton: document.querySelector("#openDebugButton"),
 
   cantos: {
     envido: document.querySelector("#envidoButton"),
@@ -433,7 +442,7 @@ function showOutcomeModal(type, eventData, options = {}) {
     if (continueBtn) continueBtn.hidden = true;
     if (restartBtn) {
       restartBtn.hidden = false;
-      restartBtn.textContent = "REINICIAR RUN (NUEVA SEED) 🔄";
+      restartBtn.textContent = "REINICIAR RUN (NUEVA SEED)";
     }
     if (lbBox) {
       lbBox.hidden = false;
@@ -490,7 +499,8 @@ async function animateJokersActivation(playedCard, remainingHand) {
 
   for (let i = 0; i < state.jokers.length; i += 1) {
     const joker = state.jokers[i];
-    const jokerCardEl = container.children[i];
+    const slotEl = container.children[i];
+    const jokerCardEl = slotEl?.querySelector?.(".joker-card") || slotEl;
     if (!jokerCardEl || !jokerCardEl.classList.contains("joker-card")) continue;
 
     let triggers = false;
@@ -856,9 +866,12 @@ function renderJokerCollection() {
   elements.jokerCount.textContent = `${state.jokers.length} / 5 SLOTS`;
   elements.jokerList.replaceChildren();
 
-  // Exactly 5 vertical slots in Balatro style
+  // Exactly 5 vertical slots in Balatro style with external action controls below
   for (let slotIndex = 0; slotIndex < 5; slotIndex += 1) {
     const joker = state.jokers[slotIndex];
+    const slotWrapper = document.createElement("div");
+    slotWrapper.className = "joker-slot-unit";
+
     if (joker) {
       const card = document.createElement("article");
       card.className = `joker-card joker-card-${joker.rarity}`;
@@ -876,7 +889,7 @@ function renderJokerCollection() {
 
       const nameText = document.createElement("span");
       nameText.className = "joker-title-text";
-      nameText.textContent = joker.name;
+      nameText.textContent = (joker.emoji ? joker.emoji + " " : "") + joker.name;
 
       const rarityBadge = document.createElement("span");
       rarityBadge.className = "joker-rarity-badge";
@@ -884,31 +897,33 @@ function renderJokerCollection() {
 
       header.append(nameText, rarityBadge);
 
-      // Center body with card_reverse artwork as placeholder
+      // Center body with artwork filling the full card body cleanly
       const body = document.createElement("div");
       body.className = "joker-art-container";
-      const artImg = document.createElement("img");
-      artImg.className = "joker-art-img";
-      artImg.src = "assets/cards/card_reverse.png";
-      artImg.alt = joker.name;
-      artImg.draggable = false;
-      body.append(artImg);
+      const artEmoji = document.createElement("div");
+      artEmoji.className = "joker-art-emoji";
+      artEmoji.textContent = joker.emoji || "🃏";
+      artEmoji.setAttribute("aria-label", joker.name);
+      body.append(artEmoji);
 
-      // Footer: Vender button + Move buttons EXACTLY UNDER the sell button
-      const footer = document.createElement("div");
-      footer.className = "joker-footer";
+      // Card only holds header and artwork - NO buttons inside!
+      card.append(header, body);
+      slotWrapper.append(card);
+
+      // Controls placed OUTSIDE the card, directly underneath
+      const controls = document.createElement("div");
+      controls.className = "joker-controls-outside";
 
       const sellBtn = document.createElement("button");
       sellBtn.className = "button button-sell arcade-btn";
       sellBtn.type = "button";
-      sellBtn.textContent = `Vender ${formatMoney(refund)}`;
-      sellBtn.setAttribute("aria-label", `Vender ${joker.name} por ${formatMoney(refund)}`);
+      sellBtn.textContent = `Vender $${formatMoney(refund)}`;
+      sellBtn.setAttribute("aria-label", `Vender ${joker.name} por $${formatMoney(refund)}`);
       sellBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
         applyAction({ type: "SELL_JOKER", itemId: joker.id });
       });
-      footer.append(sellBtn);
 
       const moveControls = document.createElement("div");
       moveControls.className = "joker-move-controls";
@@ -938,17 +953,37 @@ function renderJokerCollection() {
       });
 
       moveControls.append(leftBtn, rightBtn);
-      footer.append(moveControls);
-
-      card.append(header, body, footer);
-      elements.jokerList.append(card);
+      controls.append(sellBtn, moveControls);
+      slotWrapper.append(controls);
     } else {
       // Empty slot placeholder
       const emptySlot = document.createElement("div");
       emptySlot.className = "joker-slot-empty";
       emptySlot.innerHTML = `<span class="empty-slot-plus">+</span><span class="empty-slot-label">COMODÍN</span><span class="empty-slot-sub">${slotIndex + 1}/5</span>`;
-      elements.jokerList.append(emptySlot);
+
+      const placeholder = document.createElement("div");
+      placeholder.className = "joker-controls-placeholder";
+
+      slotWrapper.append(emptySlot, placeholder);
     }
+    elements.jokerList.append(slotWrapper);
+  }
+}
+
+let pendingUpgradeItem = null;
+let deckUpgradeMode = false;
+
+function openDeckForUpgrade(item) {
+  pendingUpgradeItem = item;
+  deckUpgradeMode = true;
+  const title = document.querySelector("#deckDialogTitle");
+  if (title) {
+    title.textContent = `APLICAR: ${item.name.toUpperCase()} ($${ITEM_PRICES[item.rarity]}) · Hacé clic en la carta a mejorar`;
+    title.style.color = "#55efc4";
+  }
+  renderDeckViewer();
+  if (elements.deckDialog) {
+    elements.deckDialog.showModal();
   }
 }
 
@@ -979,105 +1014,185 @@ function renderShop() {
     elements.shopReroll.disabled = state.money < 5;
   }
 
+  // 1. OFERTAS DE JOKERS (3 arriba)
+  let jokerOfferIds = state.shopJokerOffers || [];
+  if (jokerOfferIds.length === 0 && state.shopOffers) {
+    jokerOfferIds = state.shopOffers.filter((id) => {
+      const item = itemById(state.officialItems, id);
+      return item && item.kind === "joker";
+    });
+  }
+
   elements.shopOffers.replaceChildren();
-  for (let index = 0; index < state.shopOffers.length; index += 1) {
-    const itemId = state.shopOffers[index];
+  for (let index = 0; index < jokerOfferIds.length; index += 1) {
+    const itemId = jokerOfferIds[index];
     const item = itemById(state.officialItems, itemId);
     if (!item) continue;
 
     const wrapper = document.createElement("article");
     wrapper.className = "shop-offer-wrapper";
 
-    // Top price badge
-    const priceBadge = document.createElement("div");
-    priceBadge.className = "shop-price-tag";
-    priceBadge.textContent = `$${ITEM_PRICES[item.rarity]}`;
-    wrapper.append(priceBadge);
-
-    // Card element
     const card = document.createElement("div");
-    card.className = `shop-item-card shop-card-${item.rarity}`;
+    card.className = `shop-item-card shop-card-${item.rarity} shop-item-joker joker-card-${item.rarity}`;
     card.dataset.rarity = item.rarity;
 
+    // 1. Rareza: texto chico, en el color del borde, arriba
     const rarity = document.createElement("span");
     rarity.className = "shop-rarity";
     rarity.textContent = item.rarity.replace("pocoComun", "poco común").toUpperCase();
-    card.append(rarity);
 
-    if (item.kind === "joker") {
-      card.classList.add("shop-item-joker", `joker-card-${item.rarity}`);
-      const body = document.createElement("div");
-      body.className = "joker-art-container";
-      const artImg = document.createElement("img");
-      artImg.className = "joker-art-img";
-      artImg.src = "assets/cards/card_reverse.png";
-      artImg.alt = item.name;
-      artImg.draggable = false;
-      body.append(artImg);
-      const title = document.createElement("h3");
-      title.className = "shop-item-title";
-      title.textContent = item.name;
-      card.append(title, body);
-    } else {
-      const title = document.createElement("h3");
-      title.className = "shop-item-title";
-      title.textContent = item.name;
-      card.append(title);
-    }
+    // 2. Zona de arte: ocupa ~50% de la altura, ícono/arte grande y centrado
+    const body = document.createElement("div");
+    body.className = "joker-art-container";
+    const artEmoji = document.createElement("div");
+    artEmoji.className = "joker-art-emoji";
+    artEmoji.textContent = item.emoji || "🃏";
+    artEmoji.setAttribute("aria-label", item.name);
+    body.append(artEmoji);
 
+    // 3. Nombre: grande, centrado, sin repetir el ícono junto al nombre
+    const title = document.createElement("h3");
+    title.className = "shop-item-title";
+    title.textContent = item.name;
+
+    // 4. Efecto: tamaño legible, centrado, máx. 3-4 líneas
     const description = document.createElement("p");
     description.className = "shop-description";
     description.textContent = item.description;
-    card.append(description);
 
-    if (item.kind === "cardUpgrade") {
-      const select = document.createElement("select");
-      select.className = "shop-card-select";
-      select.setAttribute("aria-label", `Carta para ${item.name}`);
-      const placeholder = document.createElement("option");
-      placeholder.value = "";
-      placeholder.textContent = "Elegí una carta del mazo";
-      select.append(placeholder);
-      for (const deckCard of createDeck()) {
-        const option = document.createElement("option");
-        option.value = deckCard.id;
-        option.textContent = `${deckCard.rank} de ${deckCard.suit}`;
-        select.append(option);
-      }
-      card.append(select);
+    card.append(rarity, body, title, description);
 
-      const buyButton = document.createElement("button");
-      buyButton.className = "button button-primary arcade-btn shop-buy-btn";
-      buyButton.type = "button";
-      buyButton.textContent = "COMPRAR MEJORA";
-      buyButton.disabled = state.money < ITEM_PRICES[item.rarity];
-      buyButton.addEventListener("click", () => {
-        if (!select.value) {
-          triggerToast("Elegí una carta del mazo primero", "info");
-          return;
-        }
-        applyAction({ type: "BUY_ITEM", itemId, cardId: select.value });
-      });
-      card.append(buyButton);
-    } else if (item.kind === "joker") {
-      const buyButton = document.createElement("button");
-      buyButton.className = "button button-primary arcade-btn shop-buy-btn";
-      buyButton.type = "button";
-      buyButton.textContent = "COMPRAR COMODÍN";
-      buyButton.disabled = state.money < ITEM_PRICES[item.rarity] || state.jokers.length >= 5;
-      if (state.jokers.length >= 5) buyButton.title = "Vendé un comodín arriba para liberar espacio.";
-      buyButton.addEventListener("click", () => applyAction({ type: "BUY_ITEM", itemId }));
-      card.append(buyButton);
+    // Debajo de cada carta, botón de ancho completo con precio incluido: "COMPRAR · $4"
+    const price = ITEM_PRICES[item.rarity];
+    const hasEnoughMoney = state.money >= price;
+    const maxJokers = state.jokers.some((j) => j.id === "comodin-triqui-traka") ? 7 : 5;
+    const isJokerLimitReached = state.jokers.length >= maxJokers;
+    const isDisabled = !hasEnoughMoney || isJokerLimitReached;
+
+    const buyButton = document.createElement("button");
+    buyButton.className = `button arcade-btn shop-buy-btn${!hasEnoughMoney ? " is-insufficient" : ""}`;
+    buyButton.type = "button";
+    buyButton.disabled = isDisabled;
+
+    const buyText = document.createElement("span");
+    buyText.className = "shop-buy-text";
+    buyText.textContent = "COMPRAR";
+
+    const buySep = document.createElement("span");
+    buySep.className = "shop-buy-sep";
+    buySep.textContent = "·";
+
+    const buyPrice = document.createElement("span");
+    buyPrice.className = "shop-buy-price";
+    buyPrice.textContent = `$${price}`;
+
+    buyButton.append(buyText, buySep, buyPrice);
+
+    if (isJokerLimitReached) {
+      buyButton.title = "Vendé un comodín en la barra superior para liberar espacio.";
     }
+    buyButton.addEventListener("click", () => applyAction({ type: "BUY_ITEM", itemId }));
 
-    wrapper.append(card);
+    wrapper.append(card, buyButton);
     elements.shopOffers.append(wrapper);
+  }
+
+  // 2. OFERTAS DE MEJORAS DE CARTA (2 abajo)
+  let upgradeOfferIds = state.shopUpgradeOffers || [];
+  if (upgradeOfferIds.length === 0 && state.shopOffers) {
+    upgradeOfferIds = state.shopOffers.filter((id) => {
+      const item = itemById(state.officialItems, id);
+      return item && item.kind === "cardUpgrade";
+    });
+  }
+
+  if (elements.shopUpgradesSection) {
+    elements.shopUpgradesSection.style.display = "";
+  }
+
+  if (elements.shopUpgradesOffers) {
+    elements.shopUpgradesOffers.replaceChildren();
+    if (upgradeOfferIds.length === 0) {
+      const emptyNote = document.createElement("div");
+      emptyNote.className = "shop-empty-msg";
+      emptyNote.textContent = "No hay mejoras disponibles esta ronda.";
+      elements.shopUpgradesOffers.append(emptyNote);
+    } else {
+      for (let index = 0; index < upgradeOfferIds.length; index += 1) {
+        const itemId = upgradeOfferIds[index];
+        const item = itemById(state.officialItems, itemId);
+        if (!item) continue;
+
+        const wrapper = document.createElement("article");
+        wrapper.className = "shop-offer-wrapper";
+
+        const card = document.createElement("div");
+        card.className = `shop-item-card shop-card-${item.rarity} shop-item-upgrade`;
+        card.dataset.rarity = item.rarity;
+
+        // 1. Rareza: texto chico, en el color del borde, arriba
+        const rarity = document.createElement("span");
+        rarity.className = "shop-rarity";
+        rarity.textContent = `MEJORA · ${item.rarity.replace("pocoComun", "poco común").toUpperCase()}`;
+
+        // 2. Zona de arte: ocupa ~50% de la altura, ícono/arte grande y centrado
+        const body = document.createElement("div");
+        body.className = "joker-art-container";
+        const artEmoji = document.createElement("div");
+        artEmoji.className = "joker-art-emoji";
+        const upgradeEmoji = item.emoji || (item.effect?.stage === "money" ? "💰" : item.effect?.stage === "mult" ? "✨" : "🎴");
+        artEmoji.textContent = upgradeEmoji;
+        artEmoji.setAttribute("aria-label", item.name);
+        body.append(artEmoji);
+
+        // 3. Nombre: grande, centrado, sin repetir el ícono junto al nombre
+        const title = document.createElement("h3");
+        title.className = "shop-item-title";
+        title.textContent = item.name;
+
+        // 4. Efecto: tamaño legible, centrado, máx. 3-4 líneas
+        const description = document.createElement("p");
+        description.className = "shop-description";
+        description.textContent = item.description;
+
+        card.append(rarity, body, title, description);
+
+        // Debajo de cada carta, botón de ancho completo con precio incluido
+        const price = ITEM_PRICES[item.rarity];
+        const hasEnoughMoney = state.money >= price;
+
+        const chooseCardBtn = document.createElement("button");
+        chooseCardBtn.className = `button arcade-btn shop-buy-btn${!hasEnoughMoney ? " is-insufficient" : ""}`;
+        chooseCardBtn.type = "button";
+        chooseCardBtn.disabled = !hasEnoughMoney;
+
+        const buyText = document.createElement("span");
+        buyText.className = "shop-buy-text";
+        buyText.textContent = "COMPRAR";
+
+        const buySep = document.createElement("span");
+        buySep.className = "shop-buy-sep";
+        buySep.textContent = "·";
+
+        const buyPrice = document.createElement("span");
+        buyPrice.className = "shop-buy-price";
+        buyPrice.textContent = `$${price}`;
+
+        chooseCardBtn.append(buyText, buySep, buyPrice);
+        chooseCardBtn.addEventListener("click", () => {
+          openDeckForUpgrade(item);
+        });
+
+        wrapper.append(card, chooseCardBtn);
+        elements.shopUpgradesOffers.append(wrapper);
+      }
+    }
   }
 
   if (state.jokers.length >= 5) {
     elements.shopIntro.textContent = "Tenés 5 comodines (máximo). Hacé clic en 'Vender' en cualquier comodín de la barra superior para hacer lugar.";
   } else {
-    elements.shopIntro.textContent = "¡Ganaste el nivel y recibiste $5! Comprá mejoras o comodines para potenciar tu run.";
+    elements.shopIntro.textContent = "¡Ganaste el nivel y recibiste $5! Comprá comodines arriba o aplicá mejoras a tus cartas abajo.";
   }
 }
 
@@ -1276,6 +1391,29 @@ function renderDeckViewer(sortMode) {
 
     label.append(powerSpan, statusSpan);
     cardEl.append(img, label);
+
+    if (deckUpgradeMode && pendingUpgradeItem) {
+      cardEl.classList.add("deck-card-upgrade-target");
+      cardEl.title = `Clic para aplicar mejora: ${pendingUpgradeItem.name}\n${cardEl.title}`;
+      cardEl.addEventListener("click", () => {
+        const cName = cardName(card);
+        const confirmed = window.confirm(`¿Estás seguro de aplicar "${pendingUpgradeItem.name}" a ${cName}?`);
+        if (confirmed) {
+          const itemToApply = pendingUpgradeItem;
+          pendingUpgradeItem = null;
+          deckUpgradeMode = false;
+          const title = document.querySelector("#deckDialogTitle");
+          if (title) {
+            title.textContent = "MAZO COMPLETO (40 CARTAS)";
+            title.style.color = "var(--blue)";
+          }
+          elements.deckDialog.close();
+          applyAction({ type: "BUY_ITEM", itemId: itemToApply.id, cardId: card.id });
+          triggerToast(`¡"${itemToApply.name}" aplicada a ${cName}!`, "gold");
+        }
+      });
+    }
+
     elements.deckGrid.append(cardEl);
   }
 
@@ -1577,7 +1715,23 @@ if (elements.deckPileButton && elements.deckDialog) {
 }
 if (elements.closeDeck && elements.deckDialog) {
   elements.closeDeck.addEventListener("click", () => {
+    deckUpgradeMode = false;
+    pendingUpgradeItem = null;
+    const title = document.querySelector("#deckDialogTitle");
+    if (title) {
+      title.textContent = "MAZO COMPLETO (40 CARTAS)";
+      title.style.color = "var(--blue)";
+    }
     elements.deckDialog.close();
+  });
+  elements.deckDialog.addEventListener("cancel", () => {
+    deckUpgradeMode = false;
+    pendingUpgradeItem = null;
+    const title = document.querySelector("#deckDialogTitle");
+    if (title) {
+      title.textContent = "MAZO COMPLETO (40 CARTAS)";
+      title.style.color = "var(--blue)";
+    }
   });
 }
 
@@ -2261,10 +2415,10 @@ initParallaxTracking();
     bgmToggleBtn.addEventListener("click", () => {
       const isPlaying = BGM.toggle();
       if (!isPlaying) {
-        bgmToggleBtn.innerHTML = "<span>▶</span> REANUDAR";
+        bgmToggleBtn.innerHTML = "REANUDAR";
         bgmToggleBtn.classList.remove("playing");
       } else {
-        bgmToggleBtn.innerHTML = "<span>⏸</span> PAUSAR";
+        bgmToggleBtn.innerHTML = "PAUSAR";
         bgmToggleBtn.classList.add("playing");
       }
     });
@@ -2392,9 +2546,9 @@ initParallaxTracking();
       btn_next_round: "SIGUIENTE RONDA ➔",
       btn_view_deck: "VER MAZO",
       btn_how_to_play: "CÓMO JUGAR",
-      btn_records: "🏆 RÉCORDS",
+      btn_records: "RÉCORDS",
       btn_rules: "REGLAS",
-      btn_config: "⚙ CONFIG",
+      btn_config: "CONFIG",
       btn_restart: "REINICIAR"
     },
     en: {
@@ -2426,9 +2580,9 @@ initParallaxTracking();
       btn_next_round: "NEXT ROUND ➔",
       btn_view_deck: "VIEW DECK",
       btn_how_to_play: "HOW TO PLAY",
-      btn_records: "🏆 RECORDS",
+      btn_records: "RECORDS",
       btn_rules: "RULES",
-      btn_config: "⚙ SETTINGS",
+      btn_config: "SETTINGS",
       btn_restart: "RESTART"
     }
   };
@@ -2477,4 +2631,417 @@ initParallaxTracking();
   if (closeSettingsBtn && settingsDialog) {
     closeSettingsBtn.addEventListener("click", () => settingsDialog.close());
   }
+
+  // ========================================================
+  // CRÉDITOS DIALOG
+  // ========================================================
+  const creditsDialog = document.querySelector("#creditsDialog");
+  const introCreditsBtn = document.querySelector("#introCreditsBtn");
+  const openCreditsBtn = document.querySelector("#openCreditsButton");
+  const closeCreditsBtn = document.querySelector("#closeCreditsButton");
+
+  function openCreditsModal(e) {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    if (creditsDialog) {
+      creditsDialog.showModal();
+      SFX.playButton();
+    }
+  }
+
+  if (introCreditsBtn) introCreditsBtn.addEventListener("click", openCreditsModal);
+  if (openCreditsBtn) openCreditsBtn.addEventListener("click", openCreditsModal);
+  if (closeCreditsBtn && creditsDialog) {
+    closeCreditsBtn.addEventListener("click", () => {
+      creditsDialog.close();
+      SFX.playButton();
+    });
+  }
+
+  // ========================================================
+  // PANEL DEBUG (Ctrl + Shift + D o botón 🔧 DEBUG)
+  // ========================================================
+  const JOKER_CATALOG = FULL_CATALOG.filter((item) => item.kind === "joker");
+  let debugOpen = false;
+
+  function injectDebugPanel() {
+    if (document.getElementById("trucolite-debug-panel")) return;
+    const style = document.createElement("style");
+    style.textContent = `
+      #trucolite-debug-panel {
+        position: fixed; top: 6vh; left: 5vw; width: 90vw; max-width: 580px; max-height: 88vh;
+        z-index: 10000; background: #0f151f; border: 2px solid #ff9f43;
+        border-radius: 12px; color: #fff; font-family: var(--font-small, system-ui, sans-serif);
+        padding: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.85), 0 0 20px rgba(255, 159, 67, 0.25);
+        overflow-y: auto;
+      }
+      #trucolite-debug-panel.hidden { display: none !important; }
+      #trucolite-debug-panel h2 { margin: 0 0 4px 0; font-size: 18px; color: #ff9f43; display: flex; justify-content: space-between; align-items: center; }
+      #trucolite-debug-panel h3 { margin: 12px 0 6px 0; font-size: 12px; color: #feca57; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 3px; }
+      #trucolite-debug-panel .debug-section { background: rgba(0, 0, 0, 0.35); border: 1px solid #233142; border-radius: 6px; padding: 10px; margin-bottom: 10px; }
+      #trucolite-debug-panel .joker-list { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto; border: 1px solid #233142; border-radius: 6px; padding: 6px; background: #090e14; }
+      #trucolite-debug-panel .joker-row { display: flex; align-items: center; gap: 6px; padding: 4px; border-bottom: 1px solid #1a2330; font-size: 11px; }
+      #trucolite-debug-panel .joker-row:last-child { border-bottom: none; }
+      #trucolite-debug-panel .joker-name { flex: 1; font-weight: 700; color: #fff; }
+      #trucolite-debug-panel .joker-rarity { font-size: 9px; padding: 1px 5px; border-radius: 3px; background: #233142; white-space: nowrap; color: #a5b4fc; text-transform: uppercase; }
+      #trucolite-debug-panel .joker-desc { font-size: 10px; color: #94a3b8; margin-left: 4px; flex: 2; }
+      #trucolite-debug-panel .joker-add { background: #ff9f43; color: #000; border: none; border-radius: 4px; padding: 3px 8px; font-weight: 700; cursor: pointer; font-size: 11px; white-space: nowrap; }
+      #trucolite-debug-panel .joker-add:hover { background: #fff; }
+      #trucolite-debug-panel .debug-grid-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      #trucolite-debug-panel .debug-field { margin: 4px 0; display: flex; flex-direction: column; gap: 3px; }
+      #trucolite-debug-panel .debug-field label { font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 700; }
+      #trucolite-debug-panel select, #trucolite-debug-panel input { background: #090e14; border: 1px solid #334454; color: #fff; padding: 5px 8px; border-radius: 4px; font-size: 11px; }
+      #trucolite-debug-panel .debug-btn { background: #ff9f43; color: #000; border: none; border-radius: 4px; padding: 6px 12px; font-weight: 700; cursor: pointer; font-size: 11px; }
+      #trucolite-debug-panel .debug-btn:hover { background: #fff; }
+      #trucolite-debug-panel .debug-btn-secondary { background: #233142; color: #cbd5e1; border: 1px solid #334454; border-radius: 4px; padding: 5px 10px; font-weight: 700; cursor: pointer; font-size: 10px; }
+      #trucolite-debug-panel .debug-btn-secondary:hover { background: #334454; color: #fff; }
+      #trucolite-debug-panel .debug-btn-danger { background: #e84118; color: #fff; border: none; border-radius: 4px; padding: 5px 10px; font-weight: 700; cursor: pointer; font-size: 10px; }
+      #trucolite-debug-panel .debug-btn-danger:hover { background: #c23616; }
+      #trucolite-debug-panel .preset-btn-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+      #trucolite-debug-panel .debug-close-btn { background: transparent; border: 1px solid #ff9f43; color: #ff9f43; border-radius: 4px; padding: 2px 8px; font-size: 12px; cursor: pointer; }
+      #trucolite-debug-panel .debug-close-btn:hover { background: #ff9f43; color: #000; }
+    `;
+    document.head.appendChild(style);
+
+    const panel = document.createElement("div");
+    panel.id = "trucolite-debug-panel";
+    panel.className = "hidden";
+    panel.innerHTML = `
+      <h2>
+        <span>🔧 PANEL DEBUG (TESTING DE COMODINES)</span>
+        <button id="debug-close-top" class="debug-close-btn">✕</button>
+      </h2>
+      <div style="font-size: 10px; color: #94a3b8; margin-bottom: 10px;">Atajo: Ctrl + Shift + D · Útil para probar cada joker sin esperar suerte</div>
+
+      <!-- 1. CAMBIAR MANO DEL JUGADOR -->
+      <div class="debug-section">
+        <h3>🃏 FORZAR CARTAS EN MANO (JUGADOR)</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;">
+          <div class="debug-field">
+            <label>Carta 1:</label>
+            <select id="debug-card-1"></select>
+          </div>
+          <div class="debug-field">
+            <label>Carta 2:</label>
+            <select id="debug-card-2"></select>
+          </div>
+          <div class="debug-field">
+            <label>Carta 3:</label>
+            <select id="debug-card-3"></select>
+          </div>
+        </div>
+        <button id="debug-apply-hand" class="debug-btn" style="margin-top: 8px; width: 100%;">APLICAR MANO SELECCIONADA ➔</button>
+        <div class="preset-btn-row">
+          <button class="debug-btn-secondary" data-preset="machos">1♠ 1♣ 7♠ (Machos)</button>
+          <button class="debug-btn-secondary" data-preset="bastos">1♣ 7♣ 3♣ (Bastos)</button>
+          <button class="debug-btn-secondary" data-preset="sietes">7♠ 7♦ 7♥ (Sietes)</button>
+          <button class="debug-btn-secondary" data-preset="copas">1♥ 7♥ 12♥ (Copas)</button>
+          <button class="debug-btn-secondary" data-preset="envido33">7♠ 6♠ 1♠ (Envido 33)</button>
+          <button class="debug-btn-secondary" data-preset="reyes">12♠ 12♦ 12♣ (Pecador)</button>
+        </div>
+      </div>
+
+      <!-- 2. GESTIÓN DE COMODINES -->
+      <div class="debug-section">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="border: none; margin: 0; padding: 0;">🃏 EQUIPAR JOKERS (${JOKER_CATALOG.length} DISPONIBLES)</h3>
+          <button id="debug-clear-jokers" class="debug-btn-danger">VACIAR JOKERS</button>
+        </div>
+        <div style="margin: 6px 0;">
+          <input type="text" id="debug-joker-search" placeholder="🔍 Buscar comodín por nombre o efecto..." style="width: 100%;" />
+        </div>
+        <div class="joker-list" id="debug-joker-list"></div>
+      </div>
+
+      <!-- 3. ECONOMÍA Y VARIABLES DE PARTIDA -->
+      <div class="debug-section">
+        <h3>💰 ECONOMÍA Y ESTADO DE RONDA</h3>
+        <div class="debug-grid-fields">
+          <div class="debug-field">
+            <label>Dinero ($<span id="debug-money-display">0</span>):</label>
+            <div style="display: flex; gap: 4px;">
+              <input type="number" id="debug-money-input" placeholder="Monto" style="flex: 1;" />
+              <button id="debug-set-money" class="debug-btn">SET</button>
+            </div>
+          </div>
+          <div class="debug-field">
+            <label>Score (<span id="debug-score-display">0</span>):</label>
+            <div style="display: flex; gap: 4px;">
+              <input type="number" id="debug-score-input" placeholder="Nuevo score" style="flex: 1;" />
+              <button id="debug-set-score" class="debug-btn">SET</button>
+            </div>
+          </div>
+          <div class="debug-field">
+            <label>Descartes restantes:</label>
+            <div style="display: flex; gap: 4px;">
+              <input type="number" id="debug-discards-input" placeholder="0 - 10" style="flex: 1;" />
+              <button id="debug-set-discards" class="debug-btn">SET</button>
+            </div>
+          </div>
+          <div class="debug-field">
+            <label>Quién es Mano:</label>
+            <div style="display: flex; gap: 4px;">
+              <button id="debug-mano-player" class="debug-btn-secondary" style="flex: 1;">Jugador</button>
+              <button id="debug-mano-rival" class="debug-btn-secondary" style="flex: 1;">Rival</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. ACCIONES RÁPIDAS -->
+      <div class="debug-section" style="margin-bottom: 0;">
+        <h3>⚡ ACCIONES RÁPIDAS</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+          <button id="debug-force-shop" class="debug-btn" style="background: #10ac84; color: #fff;">ABRIR TIENDA (NUEVA)</button>
+          <button id="debug-rival-truco" class="debug-btn-secondary">RIVAL CANTA TRUCO</button>
+        </div>
+      </div>
+      <button id="debug-close-bottom" class="debug-btn-secondary" style="margin-top: 10px; width: 100%;">CERRAR PANEL DEBUG</button>
+    `;
+    document.body.appendChild(panel);
+
+    // Poblar selects de cartas
+    const allCards = createDeck();
+    const suitsAbbr = { espadas: "Esp", bastos: "Bas", oros: "Oro", copas: "Cop" };
+    ["debug-card-1", "debug-card-2", "debug-card-3"].forEach((id, index) => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      sel.replaceChildren();
+      allCards.forEach((c) => {
+        const opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = `${c.rank} de ${suitsAbbr[c.suit] || c.suit}`;
+        sel.appendChild(opt);
+      });
+      if (sel.options[index]) sel.selectedIndex = index;
+    });
+
+    // Listeners cerrar
+    const closeFn = () => { debugOpen = false; panel.classList.add("hidden"); };
+    document.getElementById("debug-close-top")?.addEventListener("click", closeFn);
+    document.getElementById("debug-close-bottom")?.addEventListener("click", closeFn);
+
+    // Botón aplicar mano personalizada
+    document.getElementById("debug-apply-hand")?.addEventListener("click", () => {
+      if (!state) return;
+      const c1 = document.getElementById("debug-card-1")?.value;
+      const c2 = document.getElementById("debug-card-2")?.value;
+      const c3 = document.getElementById("debug-card-3")?.value;
+      const deck = createDeck();
+      const newHand = [c1, c2, c3].map((id) => deck.find((c) => c.id === id)).filter(Boolean);
+      if (newHand.length > 0) {
+        state.playerHand = newHand;
+        ui.selectedIds.clear();
+        ui.message = `Mano forzada: ${newHand.map(cardName).join(", ")}`;
+        ui.tone = "win";
+        renderGame(elements, state, { ...ui, cantoAvailable });
+        triggerToast("¡Mano actualizada con éxito!", "win");
+      }
+    });
+
+    // Presets rápidos de mano
+    panel.querySelectorAll("[data-preset]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (!state) return;
+        const preset = btn.dataset.preset;
+        let cardIds = ["1-espadas", "1-bastos", "7-espadas"];
+        if (preset === "bastos") cardIds = ["1-bastos", "7-bastos", "3-bastos"];
+        else if (preset === "sietes") cardIds = ["7-espadas", "7-oros", "7-copas"];
+        else if (preset === "copas") cardIds = ["1-copas", "7-copas", "12-copas"];
+        else if (preset === "envido33") cardIds = ["7-espadas", "6-espadas", "1-espadas"];
+        else if (preset === "reyes") cardIds = ["12-espadas", "12-oros", "12-bastos"];
+
+        const sel1 = document.getElementById("debug-card-1");
+        const sel2 = document.getElementById("debug-card-2");
+        const sel3 = document.getElementById("debug-card-3");
+        if (sel1) sel1.value = cardIds[0];
+        if (sel2) sel2.value = cardIds[1];
+        if (sel3) sel3.value = cardIds[2];
+
+        const deck = createDeck();
+        state.playerHand = cardIds.map((id) => deck.find((c) => c.id === id)).filter(Boolean);
+        ui.selectedIds.clear();
+        ui.message = `Preset ${btn.textContent.trim()} aplicado.`;
+        ui.tone = "win";
+        renderGame(elements, state, { ...ui, cantoAvailable });
+        triggerToast(`Preset aplicado: ${cardIds.join(", ")}`, "win");
+      });
+    });
+
+    // Vaciar jokers
+    document.getElementById("debug-clear-jokers")?.addEventListener("click", () => {
+      if (!state) return;
+      state.jokers = [];
+      ui.message = "Inventario de jokers vaciado para pruebas.";
+      renderGame(elements, state, { ...ui, cantoAvailable });
+      renderJokerCollection();
+      triggerToast("Jokers vaciados", "info");
+    });
+
+    // Filtro buscador de jokers
+    document.getElementById("debug-joker-search")?.addEventListener("input", (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      panel.querySelectorAll(".joker-row").forEach((row) => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(q) ? "flex" : "none";
+      });
+    });
+
+    // Modificar Dinero
+    document.getElementById("debug-set-money")?.addEventListener("click", () => {
+      const input = document.getElementById("debug-money-input");
+      const value = Number(input.value);
+      if (!Number.isFinite(value) || value < 0) return;
+      if (state) {
+        state.money = value;
+        document.getElementById("debug-money-display").textContent = formatMoney(state.money);
+        renderGame(elements, state, { ...ui, cantoAvailable });
+        input.value = "";
+        triggerToast(`Dinero seteado a $${value}`, "gold");
+      }
+    });
+
+    // Modificar Score
+    document.getElementById("debug-set-score")?.addEventListener("click", () => {
+      const input = document.getElementById("debug-score-input");
+      const value = Number(input.value);
+      if (!Number.isFinite(value) || value < 0) return;
+      if (state) {
+        state.score = value;
+        document.getElementById("debug-score-display").textContent = String(state.score);
+        renderGame(elements, state, { ...ui, cantoAvailable });
+        input.value = "";
+        triggerToast(`Score seteado a ${value}`, "win");
+      }
+    });
+
+    // Modificar Descartes
+    document.getElementById("debug-set-discards")?.addEventListener("click", () => {
+      const input = document.getElementById("debug-discards-input");
+      const value = Number(input.value);
+      if (!Number.isFinite(value) || value < 0) return;
+      if (state) {
+        state.discardsRemaining = value;
+        renderGame(elements, state, { ...ui, cantoAvailable });
+        input.value = "";
+        triggerToast(`Descartes restantes: ${value}`, "info");
+      }
+    });
+
+    // Forzar mano Jugador / Rival
+    document.getElementById("debug-mano-player")?.addEventListener("click", () => {
+      if (!state) return;
+      state.mano = "player";
+      state.round.leader = "player";
+      renderGame(elements, state, { ...ui, cantoAvailable });
+      triggerToast("Sos Mano (jugador)", "win");
+    });
+    document.getElementById("debug-mano-rival")?.addEventListener("click", () => {
+      if (!state) return;
+      state.mano = "rival";
+      renderGame(elements, state, { ...ui, cantoAvailable });
+      triggerToast("El Rival es Mano", "info");
+    });
+
+    // Forzar Tienda
+    document.getElementById("debug-force-shop")?.addEventListener("click", () => {
+      if (!state) return;
+      state.phase = "shop";
+      state.shopOffers = pickShopOffers(state);
+      state.shopJokerOffers = state.shopOffers.slice();
+      state.shopUpgradeOffers = pickShopOffersForKind(state, "cardUpgrade", 2);
+      state.money = Math.max(state.money, 15);
+      renderGame(elements, state, { ...ui, cantoAvailable });
+      renderShop();
+      closeFn();
+      triggerToast("Tienda abierta con $15+ para testear", "gold");
+    });
+
+    // Rival canta truco
+    document.getElementById("debug-rival-truco")?.addEventListener("click", () => {
+      if (!state || state.phase !== "playing") return;
+      state.phase = "respondCanto";
+      state.round.pendingCanto = "truco";
+      state.round.rivalCantos.push("truco");
+      renderGame(elements, state, { ...ui, cantoAvailable });
+      closeFn();
+      triggerToast("¡El Rival cantó TRUCO! Respondé Quiero o No Quiero", "lose");
+    });
+  }
+
+  function renderDebugPanel() {
+    const list = document.getElementById("debug-joker-list");
+    if (!list) return;
+    list.replaceChildren();
+    for (const joker of JOKER_CATALOG) {
+      const row = document.createElement("div");
+      row.className = "joker-row";
+      const rarityBadge = document.createElement("span");
+      rarityBadge.className = "joker-rarity";
+      rarityBadge.textContent = joker.rarity;
+      const name = document.createElement("span");
+      name.className = "joker-name";
+      name.textContent = (joker.emoji ? joker.emoji + " " : "") + joker.name;
+      const desc = document.createElement("span");
+      desc.className = "joker-desc";
+      desc.textContent = joker.description;
+      const btn = document.createElement("button");
+      btn.className = "joker-add";
+      btn.textContent = "+ Equipar";
+      btn.addEventListener("click", () => {
+        if (!state) return;
+        const copy = JSON.parse(JSON.stringify(joker));
+        state.jokers.push(copy);
+        if (copy.id === "comodin-barajador") state.discardsRemaining += 2;
+        if (copy.id === "comodin-por-una-cabeza") state.rules.rounds += 1;
+        if (copy.id === "comodin-mazo-infinito") state.rules.cardsPerRound += 1;
+        ui.message = `Debug: joker "${joker.name}" equipado.`;
+        ui.tone = "win";
+        renderGame(elements, state, { ...ui, cantoAvailable });
+        renderJokerCollection();
+        triggerToast(`Equipado: ${joker.name}`, "win");
+      });
+      row.append(rarityBadge, name, desc, btn);
+      list.appendChild(row);
+    }
+    const moneyDisplay = document.getElementById("debug-money-display");
+    if (moneyDisplay && state) moneyDisplay.textContent = formatMoney(state.money);
+    const scoreDisplay = document.getElementById("debug-score-display");
+    if (scoreDisplay && state) scoreDisplay.textContent = String(state.score);
+    const discardsInput = document.getElementById("debug-discards-input");
+    if (discardsInput && state) discardsInput.value = state.discardsRemaining;
+  }
+
+  function toggleDebugPanel() {
+    const panel = document.getElementById("trucolite-debug-panel");
+    if (!panel) {
+      injectDebugPanel();
+    }
+    debugOpen = !debugOpen;
+    const panelEl = document.getElementById("trucolite-debug-panel");
+    if (debugOpen) {
+      panelEl.classList.remove("hidden");
+      renderDebugPanel();
+    } else {
+      panelEl.classList.add("hidden");
+    }
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey && e.shiftKey && e.key.toUpperCase() === "D") {
+      e.preventDefault();
+      toggleDebugPanel();
+    }
+  });
+
+  const openDebugBtn = document.querySelector("#openDebugButton");
+  if (openDebugBtn) {
+    openDebugBtn.addEventListener("click", () => {
+      toggleDebugPanel();
+    });
+  }
+
+  injectDebugPanel();
 })();

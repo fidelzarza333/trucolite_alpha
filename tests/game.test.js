@@ -391,7 +391,7 @@ test("the approved catalog is buyable and uses the chosen joker names", () => {
   assert.deepEqual(purchase.state.cardUpgrades, [
     { cardId: "7-bastos", itemId: "carta-brillo-cobre" }
   ]);
-  assert.equal(OFFICIAL_ITEMS.length, 33);
+  assert.equal(OFFICIAL_ITEMS.length, 58);
   assert.equal(OFFICIAL_ITEMS.find((item) => item.id === "comodin-bastos-fichas").name, "Bastonero");
   assert.equal(OFFICIAL_ITEMS.find((item) => item.id === "comodin-rival-pierde-mult").name, "La última palabra");
   assert.equal(OFFICIAL_ITEMS.find((item) => item.id === "comodin-rival-pierde-dinero").name, "La revancha");

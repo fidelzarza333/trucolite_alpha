@@ -30,11 +30,14 @@ function event(type, properties) {
   return { type, ...properties };
 }
 
-function pickShopOffers(state) {
-  const pool = state.officialItems;
-  const available = pool.slice();
+export function pickShopOffersForKind(state, kind, count) {
+  const ownedJokerIds = new Set((state.jokers || []).map((j) => j.id));
+  const pool = kind
+    ? state.officialItems.filter((item) => item.kind === kind && !ownedJokerIds.has(item.id))
+    : state.officialItems.filter((item) => !(item.kind === "joker" && ownedJokerIds.has(item.id)));
+  const available = pool.length > 0 ? pool.slice() : state.officialItems.slice();
   const offers = [];
-  while (offers.length < 3 && available.length > 0) {
+  while (offers.length < count && available.length > 0) {
     const presentWeights = RARITY_WEIGHTS.filter((entry) => available.some((item) => item.rarity === entry.rarity));
     const totalWeight = presentWeights.reduce((sum, entry) => sum + entry.weight, 0);
     const weightRoll = randomIndex(state.rng, totalWeight);
@@ -57,6 +60,14 @@ function pickShopOffers(state) {
     available.splice(removeIndex, 1);
   }
   return offers;
+}
+
+export function pickShopOffers(state) {
+  const jokers = state.officialItems.filter((item) => item.kind === "joker");
+  if (jokers.length >= 3) {
+    return pickShopOffersForKind(state, "joker", 3);
+  }
+  return pickShopOffersForKind(state, null, 3);
 }
 
 function playRivalCard(state, events) {
@@ -109,7 +120,13 @@ function dealRound(state, mano, events) {
     winner: null,
     discardsUsedInRound: 0,
     extraChipsFromDiscard: 0,
-    lastPlayerEnvidoTanto: 0
+    lastPlayerEnvidoTanto: 0,
+    coleccionistaRerollUsado: false,
+    todoONadaTriggered: false,
+    espadasRetainedTotal: 0,
+    copasRetainedTotal: 0,
+    orosRetainedTotal: 0,
+    bastosRetainedTotal: 0
   };
   events.push(event("ROUND_DEALT", { roundNumber: state.roundNumber, mano }));
   if (mano === "rival") {
@@ -126,6 +143,8 @@ function finishMatch(state, events) {
     state.phase = "shop";
     state.money += 5;
     state.shopOffers = pickShopOffers(state);
+    state.shopJokerOffers = state.shopOffers.slice();
+    state.shopUpgradeOffers = pickShopOffersForKind(state, "cardUpgrade", 2);
     events.push(event("LEVEL_WON", {
       level: state.level,
       score: state.score,
@@ -151,6 +170,7 @@ function playedPlayerCards(round) {
 }
 
 function effectMatchesTrigger(trigger, state, cards) {
+  if (!trigger) return true;
   if (trigger.type === "CARD_SUIT_PLAYED") {
     return cards.some((card) => card.suit === trigger.suit);
   }
@@ -167,7 +187,8 @@ function effectMatchesTrigger(trigger, state, cards) {
     return state.playerHand.some((card) => card.rank === trigger.rank);
   }
   if (trigger.type === "CARDS_IN_HAND_COUNT_SUIT") {
-    return state.playerHand.some((card) => card.suit === trigger.suit);
+    const suitKey = `${trigger.suit}RetainedTotal`;
+    return (state.round && (state.round[suitKey] || 0) > 0) || state.playerHand.some((card) => card.suit === trigger.suit);
   }
   if (trigger.type === "POSITIONAL_MULT") {
     return true;
@@ -250,7 +271,12 @@ export function getRoundEffects(state) {
       const matchCount = cards.filter((c) => c.suit === joker.trigger.suit).length;
       for (let k = 0; k < matchCount; k += 1) {
         if (joker.effect.stage === "money") moneyEarned += joker.effect.value;
-        else effects.push(joker.effect);
+        else if (joker.effect.stage === "composite") {
+          if (joker.effect.chips) effects.push({ stage: "chips", op: "add", value: joker.effect.chips });
+          if (joker.effect.mult) effects.push({ stage: "mult", op: "add", value: joker.effect.mult });
+        } else {
+          effects.push(joker.effect);
+        }
       }
       continue;
     }
@@ -259,7 +285,35 @@ export function getRoundEffects(state) {
       const matchCount = cards.filter((c) => c.rank === joker.trigger.rank).length;
       for (let k = 0; k < matchCount; k += 1) {
         if (joker.effect.stage === "money") moneyEarned += joker.effect.value;
-        else effects.push(joker.effect);
+        else if (joker.effect.stage === "composite") {
+          if (joker.effect.chips) effects.push({ stage: "chips", op: "add", value: joker.effect.chips });
+          if (joker.effect.mult) effects.push({ stage: "mult", op: "add", value: joker.effect.mult });
+        } else {
+          effects.push(joker.effect);
+        }
+      }
+      continue;
+    }
+
+    if (joker.trigger && joker.trigger.type === "CARD_RANK_SUIT_PLAYED") {
+      const matchCount = cards.filter((c) => c.rank === joker.trigger.rank && c.suit === joker.trigger.suit).length;
+      for (let k = 0; k < matchCount; k += 1) {
+        if (joker.effect.stage === "money") moneyEarned += joker.effect.value;
+        else if (joker.effect.stage === "composite") {
+          if (joker.effect.mult) {
+            for (let eIdx = 0; eIdx < effects.length; eIdx += 1) {
+              if (effects[eIdx].stage === "mult") {
+                effects[eIdx] = { ...effects[eIdx], value: effects[eIdx].value * joker.effect.mult };
+              }
+            }
+          }
+          if (joker.effect.chips) effects.push({ stage: "chips", op: "add", value: joker.effect.chips });
+          if (joker.effect.money) moneyEarned += joker.effect.money;
+        } else if (joker.effect.stage === "passive" && joker.effect.op === "rey_oro") {
+          state.discardsRemaining += (joker.effect.value || 1);
+        } else {
+          effects.push(joker.effect);
+        }
       }
       continue;
     }
@@ -280,11 +334,15 @@ export function getRoundEffects(state) {
       if (joker.effect.chips) effects.push({ stage: "chips", op: "add", value: joker.effect.chips });
       if (joker.effect.mult) effects.push({ stage: "mult", op: "add", value: joker.effect.mult });
     } else if (joker.effect.stage === "chips_per_card_in_hand") {
-      const count = state.playerHand.filter((card) => card.suit === joker.effect.suit).length;
+      const suitKey = `${joker.effect.suit}RetainedTotal`;
+      const count = (state.round && state.round[suitKey]) || 0;
       if (count > 0) effects.push({ stage: "chips", op: "add", value: count * joker.effect.value });
+      continue;
     } else if (joker.effect.stage === "mult_per_card_in_hand") {
-      const count = state.playerHand.filter((card) => card.suit === joker.effect.suit).length;
+      const suitKey = `${joker.effect.suit}RetainedTotal`;
+      const count = (state.round && state.round[suitKey]) || 0;
       if (count > 0) effects.push({ stage: "mult", op: "add", value: count * joker.effect.value });
+      continue;
     } else if (joker.effect.stage === "mult_money_interest") {
       const multGain = Math.floor(state.money / joker.effect.step) * joker.effect.value;
       if (multGain > 0) effects.push({ stage: "mult", op: "add", value: multGain });
@@ -302,27 +360,143 @@ export function getRoundEffects(state) {
           effects[eIdx] = { ...effects[eIdx], value: effects[eIdx].value * joker.effect.value };
         }
       }
+    } else if (joker.effect.stage === "passive" && joker.effect.op === "todo_o_nada") {
+      if (state.roundNumber === 1 && state.round && state.round.todoONadaTriggered) {
+        effects.push({ stage: "chips", op: "add", value: 15 });
+        effects.push({ stage: "mult", op: "add", value: 5 });
+      }
+      continue;
+    } else if (joker.effect.stage === "passive" && joker.effect.op === "letra_chica") {
+      joker.accumulatedChips = (joker.accumulatedChips || 0);
+      continue;
+    } else if (joker.effect.stage === "passive") {
+      continue;
     } else {
       effects.push(joker.effect);
     }
+  }
+  if (state.tangoMult && state.tangoMult > 0) {
+    effects.push({ stage: "mult", op: "add", value: state.tangoMult });
   }
   return { effects, moneyEarned };
 }
 
 function resolveRound(state, events, forcedWinner) {
   state.round.winner = forcedWinner || getRoundWinner(state.round.tricks, state.mano);
+  // Letra Chica: calcular chips acumulados por bazas ganadas/perdidas antes de los efectos
+  let letraChicaExtra = 0;
+  for (let j = 0; j < state.jokers.length; j += 1) {
+    const joker = state.jokers[j];
+    if (joker.effect.stage === "passive" && joker.effect.op === "letra_chica") {
+      let gained = 0;
+      for (let t = 0; t < state.round.tricks.length; t += 1) {
+        if (state.round.tricks[t].winner === "player") gained += 1;
+        else if (state.round.tricks[t].winner === "rival") gained -= 1;
+      }
+      joker.accumulatedChips = (joker.accumulatedChips || 0) + gained;
+    }
+  }
+  let cantoWonThisRound = false;
+  for (let c = 0; c < state.round.playerCantos.length; c += 1) {
+    if (["envido", "flor", "truco", "retruco", "valeCuatro"].includes(state.round.playerCantos[c])) {
+      cantoWonThisRound = true;
+      break;
+    }
+  }
   const roundEffects = getRoundEffects(state);
+  const extraEffects = [];
+  if (cantoWonThisRound) {
+    for (let j = 0; j < state.jokers.length; j += 1) {
+      const joker = state.jokers[j];
+      if (joker.effect.stage === "passive" && joker.effect.op === "letra_chica" && (joker.accumulatedChips || 0) > 0) {
+        letraChicaExtra = joker.accumulatedChips;
+        joker.accumulatedChips = 0;
+      }
+    }
+  }
+  if (letraChicaExtra > 0) {
+    extraEffects.push({ stage: "chips", op: "add", value: letraChicaExtra });
+  }
+  const allEffects = roundEffects.effects.concat(extraEffects);
   const result = scoreRound({
     rules: state.rules,
     round: state.round,
     mano: state.mano,
     score: state.score,
     winner: state.round.winner
-  }, roundEffects.effects);
+  }, allEffects);
   state.score = result.score;
   state.money += roundEffects.moneyEarned;
   state.roundsCompleted += 1;
   state.phase = "roundEnded";
+
+  // Pomberito: +1$ baza ganada, -1$ baza perdida
+  let pomberitoDelta = 0;
+  for (let j = 0; j < state.jokers.length; j += 1) {
+    const joker = state.jokers[j];
+    if (joker.effect.stage === "passive" && joker.effect.op === "pomberito") {
+      let gained = 0;
+      for (let t = 0; t < state.round.tricks.length; t += 1) {
+        if (state.round.tricks[t].winner === "player") gained += 1;
+        else if (state.round.tricks[t].winner === "rival") gained -= 1;
+      }
+      pomberitoDelta += gained * (joker.effect.value || 1);
+    }
+  }
+  state.money = Math.max(0, state.money + pomberitoDelta);
+
+  // Jacaranda: +1$ al finalizar cada ronda, +1$ extra si cantó Vale 4 y ganó; se paga y resetea
+  let jacarandaPayout = 0;
+  const wonValeCuatro = state.round.playerCantos.some((c) => c === "valeCuatro");
+  for (let j = 0; j < state.jokers.length; j += 1) {
+    const joker = state.jokers[j];
+    if (joker.effect.stage === "passive" && joker.effect.op === "jacaranda") {
+      joker.accumulatedMoney = (joker.accumulatedMoney || 0) + (joker.effect.value || 1);
+      if (wonValeCuatro) {
+        joker.accumulatedMoney += (joker.effect.value || 1);
+      }
+      jacarandaPayout += joker.accumulatedMoney;
+      joker.accumulatedMoney = 0;
+    }
+  }
+  state.money += jacarandaPayout;
+
+  // Revancha: al perder una ronda, activar que el próximo envido ganado valga el doble
+  if (state.round.winner === "rival" && state.jokers.some((j) => j.id === "comodin-revancha")) {
+    state.envidoDoble = true;
+  }
+
+  // Tango: al ganar 3 bazas seguidas en una ronda, x2 mult permanente
+  let tangoStreak = 0;
+  let tangoTriggered = false;
+  for (let t = state.round.tricks.length - 1; t >= 0; t -= 1) {
+    if (state.round.tricks[t].winner === "player") {
+      tangoStreak += 1;
+      if (tangoStreak >= 3) {
+        tangoTriggered = true;
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+  if (tangoTriggered && state.jokers.some((j) => j.id === "comodin-tango")) {
+    state.tangoMult = (state.tangoMult || 0) + 2;
+  }
+
+  // Milagro: al alcanzar 50% del target del nivel, completarlo y vender el comodin
+  for (let j = 0; j < state.jokers.length; j += 1) {
+    const joker = state.jokers[j];
+    if (joker.effect.stage === "passive" && joker.effect.op === "miracle") {
+      const threshold = Math.ceil(state.levelTarget * 0.5);
+      if (state.score >= threshold) {
+        state.score = state.levelTarget;
+        state.jokers.splice(j, 1);
+        j -= 1;
+      }
+    }
+  }
+
   if (state.round.winner === "player") {
     for (let index = 0; index < state.round.rivalCantos.length; index += 1) {
       events.push(event("RIVAL_CANTO_LOST", { canto: state.round.rivalCantos[index] }));
@@ -343,27 +517,24 @@ function rejectCanto(state, canto, events) {
   const reward = state.rules.cantos[canto].rejectReward;
   const lossEnvido = state.round.envido === "lost" ? state.rules.cantos.envido.lossPenalty : 0;
   const lossFlor = state.round.flor === "lost" ? state.rules.cantos.flor.lossPenalty : 0;
-  state.roundsCompleted += 1;
-  state.score = Math.max(0, state.score + reward - lossEnvido - lossFlor);
-  state.phase = "roundEnded";
-  events.push(event("ROUND_RESOLVED", {
-    winner: "player",
-    playerTricks: trickCounts(state.round, "player"),
-    rivalTricks: trickCounts(state.round, "rival"),
-    chips: 0,
-    mult: 1,
-    xmult: 1,
-    earned: 0,
-    rejectReward: reward,
-    lossTruco: 0,
-    lossEnvido,
-    lossFlor,
-    score: state.score,
-    roundNumber: state.roundNumber,
-    roundsCompleted: state.roundsCompleted,
-    rejected: canto
-  }));
-  finishMatch(state, events);
+  // Set truco level as if rival accepted
+  const trucoLevel = canto === "truco" ? 1 : canto === "retruco" ? 2 : 3;
+  state.round.trucoLevel = trucoLevel;
+  state.round.playerCantos.push(canto);
+  // Resolve the round with player as winner (activates jokers, calculates score from tricks)
+  resolveRound(state, events, "player");
+  // Ensure minimum reward if earned is less than rejectReward
+  const lastEvent = events[events.length - 1];
+  if (lastEvent && lastEvent.type === "ROUND_RESOLVED") {
+    if (lastEvent.earned < reward) {
+      state.score = Math.max(0, state.score + (reward - lastEvent.earned) - lossEnvido - lossFlor);
+      lastEvent.score = state.score;
+    }
+    lastEvent.rejectReward = reward;
+    lastEvent.lossEnvido = lossEnvido;
+    lastEvent.lossFlor = lossFlor;
+    lastEvent.rejected = canto;
+  }
 }
 
 function rejectRivalCanto(state, canto, events) {
@@ -423,13 +594,26 @@ function playCard(state, action, events) {
     nextEvents.push(event("RIVAL_PLAYED", { card: rivalCard, leader: false }));
   }
   const rivalCard = next.round.table.rivalCard;
-  const playerPower = cardPower(playerCard);
+  let playerPower = cardPower(playerCard);
   const rivalPower = cardPower(rivalCard);
-  const winner = playerPower > rivalPower ? "player" : playerPower < rivalPower ? "rival" : "tie";
+  if (next.round.leader === "player" && next.round.playerPlayedCount === 1 && next.jokers.some((j) => j.id === "comodin-mano-firme")) {
+    playerPower += 1;
+  }
+  let winner = playerPower > rivalPower ? "player" : playerPower < rivalPower ? "rival" : "tie";
+  if (winner === "rival" && playerCard.rank === 7 && next.jokers.some((j) => j.id === "comodin-siete-vida")) {
+    winner = "tie";
+  }
   const leader = next.round.leader;
   const trick = { leader, playerCard, rivalCard, winner };
   next.round.tricks.push(trick);
   next.round.table = { playerCard: null, rivalCard: null };
+  for (let cIdx = 0; cIdx < next.playerHand.length; cIdx += 1) {
+    const s = next.playerHand[cIdx].suit;
+    if (s === "espadas") next.round.espadasRetainedTotal = (next.round.espadasRetainedTotal || 0) + 1;
+    else if (s === "copas") next.round.copasRetainedTotal = (next.round.copasRetainedTotal || 0) + 1;
+    else if (s === "oros") next.round.orosRetainedTotal = (next.round.orosRetainedTotal || 0) + 1;
+    else if (s === "bastos") next.round.bastosRetainedTotal = (next.round.bastosRetainedTotal || 0) + 1;
+  }
   nextEvents.push(event("TRICK_RESOLVED", { ...trick, trickNumber: next.round.tricks.length }));
   if (next.round.tricks.length === next.rules.cardsPerRound) {
     resolveRound(next, nextEvents);
@@ -457,6 +641,15 @@ function discard(state, action) {
   }
   const next = copyState(state);
   const discarded = next.playerHand.filter((card) => uniqueIds.includes(card.id));
+  const kept = next.playerHand.filter((card) => !uniqueIds.includes(card.id));
+  if (next.roundNumber === 1 && discarded.length === 2 && kept.length === 1) {
+    const keptPower = cardPower(kept[0]);
+    const d0Power = cardPower(discarded[0]);
+    const d1Power = cardPower(discarded[1]);
+    if (keptPower <= d0Power && keptPower <= d1Power) {
+      next.round.todoONadaTriggered = true;
+    }
+  }
   next.playerHand = next.playerHand.filter((card) => !uniqueIds.includes(card.id));
   for (let index = 0; index < discarded.length; index += 1) {
     const draw = randomIndex(next.rng, next.deck.length);
@@ -502,9 +695,9 @@ function canCall(state, canto) {
     return round.playerPlayedCount === 0 && round.envido === "none"
       && round.flor === "none" && hasFlor(state.playerHand);
   }
-  if (canto === "truco") return round.trucoLevel === 0;
-  if (canto === "retruco") return round.trucoLevel === 1;
-  if (canto === "valeCuatro") return round.trucoLevel === 2;
+  if (canto === "truco") return round.trucoLevel === 0 || round.pendingRecall === "truco";
+  if (canto === "retruco") return round.trucoLevel === 1 || round.pendingRecall === "retruco";
+  if (canto === "valeCuatro") return round.trucoLevel === 2 || round.pendingRecall === "valeCuatro";
   return false;
 }
 
@@ -532,7 +725,9 @@ function callCanto(state, action) {
     next.round.envido = playerWins ? "won" : "lost";
     next.round.lastPlayerEnvidoTanto = playerTanto;
     if (playerWins) {
-      next.money += 1;
+      const envidoReward = (next.envidoDoble === true) ? 2 : 1;
+      next.money += envidoReward;
+      next.envidoDoble = false;
       next.round.playerCantos.push(canto);
       for (let j = 0; j < next.jokers.length; j += 1) {
         if (next.jokers[j].trigger && next.jokers[j].trigger.type === "SCALING_CANTO_WINS") {
@@ -540,7 +735,9 @@ function callCanto(state, action) {
         }
       }
     } else {
-      next.money = Math.max(0, next.money - 1);
+      if (!next.jokers.some((j) => j.id === "comodin-envido-vago")) {
+        next.money = Math.max(0, next.money - 1);
+      }
     }
     events.push(event("ENVIDO_RESOLVED", { playerTanto, rivalTanto, winner: playerWins ? "player" : "rival", moneyDelta: playerWins ? 1 : -1 }));
     // Si El Rival es el líder y aún no jugó su carta, la juega tras resolver el canto
@@ -565,7 +762,11 @@ function callCanto(state, action) {
         }
       }
     } else {
-      next.money = Math.max(0, next.money - 1);
+      if (next.jokers.some((j) => j.id === "comodin-milonga")) {
+        next.money += 2;
+      } else {
+        next.money = Math.max(0, next.money - 1);
+      }
     }
     events.push(event("FLOR_RESOLVED", { playerTanto, rivalTanto, rivalHasFlor, winner: playerWins ? "player" : "rival", moneyDelta: playerWins ? 1 : -1 }));
     // Si El Rival es el líder y aún no jugó su carta, la juega tras resolver el canto
@@ -576,6 +777,7 @@ function callCanto(state, action) {
   }
   const answer = decideCanto(next, canto, next.rng);
   next.rng = answer.rng;
+  if (next.round.pendingRecall === canto) next.round.pendingRecall = null;
   events.push(event("CANTO_ANSWERED", { canto, wants: answer.wants, level: answer.level }));
   if (answer.wants) {
     next.round.trucoLevel = canto === "truco" ? 1 : canto === "retruco" ? 2 : 3;
@@ -598,6 +800,12 @@ function answerCanto(state, action) {
     wants: action.wants
   })];
   if (!action.wants) {
+    if (next.jokers.some((j) => j.id === "comodin-doble-oportunidad")) {
+      next.phase = "playing";
+      next.round.pendingRecall = canto;
+      events[0].dobleOportunidad = true;
+      return { state: next, events };
+    }
     rejectRivalCanto(next, canto, events);
     return { state: next, events };
   }
@@ -610,27 +818,40 @@ function answerCanto(state, action) {
 
 function buyItem(state, action) {
   if (state.phase !== "shop") return error(state, "WRONG_PHASE");
-  if (!state.shopOffers.includes(action.itemId)) return error(state, "ITEM_NOT_AVAILABLE");
+  const inOffers = state.shopOffers.includes(action.itemId)
+    || (state.shopJokerOffers || []).includes(action.itemId)
+    || (state.shopUpgradeOffers || []).includes(action.itemId);
+  if (!inOffers) return error(state, "ITEM_NOT_AVAILABLE");
   const item = itemById(state.officialItems, action.itemId);
   if (!item) return error(state, "ITEM_NOT_APPROVED");
-  if (item.kind === "joker" && state.jokers.length >= 5) return error(state, "JOKER_LIMIT_REACHED");
+  const jokerLimit = (state.jokers.some((j) => j.id === "comodin-triqui-traka")) ? 7 : 5;
+  if (item.kind === "joker" && state.jokers.length >= jokerLimit) return error(state, "JOKER_LIMIT_REACHED");
   const price = ITEM_PRICES[item.rarity];
   if (!Number.isFinite(price)) return error(state, "ITEM_NOT_AVAILABLE");
-  if (state.money < price) return error(state, "INSUFFICIENT_MONEY");
+  const finalPrice = (state.jokers.some((j) => j.id === "comodin-descuento")) ? Math.max(0, price - 1) : price;
+  if (state.money < finalPrice) return error(state, "INSUFFICIENT_MONEY");
   if (item.kind === "cardUpgrade") {
     if (!createDeck().some((card) => card.id === action.cardId)) {
       return error(state, "CARD_NOT_IN_DECK");
     }
   }
   const next = copyState(state);
-  next.money -= price;
+  next.money -= finalPrice;
   next.shopOffers = next.shopOffers.filter((id) => id !== item.id);
+  next.shopJokerOffers = (next.shopJokerOffers || []).filter((id) => id !== item.id);
+  next.shopUpgradeOffers = (next.shopUpgradeOffers || []).filter((id) => id !== item.id);
   if (item.kind === "cardUpgrade") {
     next.cardUpgrades.push({ cardId: action.cardId, itemId: item.id });
   } else if (item.kind === "joker") {
     next.jokers.push(item);
     if (item.id === "comodin-barajador") {
       next.discardsRemaining += 1;
+    }
+    if (item.id === "comodin-por-una-cabeza") {
+      next.rules.rounds += 1;
+    }
+    if (item.id === "comodin-mazo-infinito") {
+      next.rules.cardsPerRound += 1;
     }
   } else {
     return error(state, "ITEM_NOT_AVAILABLE");
@@ -641,7 +862,7 @@ function buyItem(state, action) {
       itemId: item.id,
       name: item.name,
       cardId: action.cardId || null,
-      price,
+      price: finalPrice,
       money: next.money
     })]
   };
@@ -653,18 +874,27 @@ function sellJoker(state, action) {
   const joker = state.jokers[jokerIndex];
   const originalPrice = ITEM_PRICES[joker.rarity];
   if (!Number.isFinite(originalPrice)) return error(state, "ITEM_NOT_AVAILABLE");
-  const refund = originalPrice / 2;
+  const refundMultiplier = state.jokers.some((j) => j.id === "comodin-negocio") ? 0.75 : 0.5;
+  const refund = originalPrice * refundMultiplier;
   const next = copyState(state);
   next.jokers.splice(jokerIndex, 1);
   next.money += refund;
+  const events = [event("JOKER_SOLD", {
+    itemId: joker.id,
+    name: joker.name,
+    refund,
+    money: next.money
+  })];
+  if (joker.id === "comodin-chacabuco" && (state.phase === "playing" || state.phase === "roundEnded")) {
+    next.phase = "roundEnded";
+    next.round.winner = "player";
+    next.roundsCompleted += 1;
+    finishMatch(next, events);
+    return { state: next, events };
+  }
   return {
     state: next,
-    events: [event("JOKER_SOLD", {
-      itemId: joker.id,
-      name: joker.name,
-      refund,
-      money: next.money
-    })]
+    events
   };
 }
 
@@ -695,6 +925,8 @@ export function createGame(rules, seed, options = {}) {
     roundsCompleted: 0,
     discardsRemaining: finalRules.discards,
     shopOffers: [],
+    shopJokerOffers: [],
+    shopUpgradeOffers: [],
     officialItems: itemCatalog.map((item) => JSON.parse(JSON.stringify(item))),
     cardUpgrades: [],
     jokers: [],
@@ -736,13 +968,20 @@ export function dispatch(state, action) {
   if (action.type === "REROLL_SHOP") {
     if (state.phase !== "shop") return error(state, "WRONG_PHASE");
     const REROLL_COST = 5;
-    if (state.money < REROLL_COST) return error(state, "INSUFFICIENT_FUNDS");
+    const hasColeccionista = state.jokers.some((j) => j.id === "comodin-coleccionista");
+    const rerollUsado = state.round && state.round.coleccionistaRerollUsado === true;
+    const cost = (hasColeccionista && !rerollUsado) ? 0 : REROLL_COST;
+    if (state.money < cost) return error(state, "INSUFFICIENT_FUNDS");
     const next = copyState(state);
-    next.money -= REROLL_COST;
-    next.shopOffers = pickShopOffers(next);
+    next.money -= cost;
+    if (hasColeccionista && !rerollUsado) {
+      next.round.coleccionistaRerollUsado = true;
+    }
+    next.shopJokerOffers = pickShopOffersForKind(next, "joker", 3);
+    next.shopOffers = next.shopJokerOffers.slice();
     return {
       state: next,
-      events: [event("SHOP_REROLLED", { cost: REROLL_COST, offers: next.shopOffers.slice() })]
+      events: [event("SHOP_REROLLED", { cost, offers: next.shopOffers.slice() })]
     };
   }
   if (action.type === "NEXT_LEVEL") {
@@ -758,6 +997,8 @@ export function dispatch(state, action) {
     next.phase = "playing";
     next.mano = next.mano === "player" ? "rival" : "player";
     next.shopOffers = [];
+    next.shopJokerOffers = [];
+    next.shopUpgradeOffers = [];
     const events = [];
     dealRound(next, next.mano, events);
     return { state: next, events };
