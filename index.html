@@ -78,22 +78,13 @@
     *, *::before, *::after { box-sizing: border-box; }
     [hidden] { display: none !important; }
 
-    /* Animated Diagonal Checkerboard Background */
-    @keyframes bg-diagonal-scroll {
+    /* GPU-Accelerated Felt Drift Animation */
+    @keyframes felt-gpu-drift {
       0% {
-        background-position: 0 0;
+        transform: translate3d(0, 0, 0);
       }
       100% {
-        background-position: 128px 128px;
-      }
-    }
-
-    @keyframes felt-bg-scroll {
-      0% {
-        background-position: center center, 0 0;
-      }
-      100% {
-        background-position: center center, 128px 128px;
+        transform: translate3d(64px, 64px, 0);
       }
     }
 
@@ -109,7 +100,6 @@
         #080d16 270deg
       );
       background-size: 64px 64px;
-      animation: bg-diagonal-scroll 28s linear infinite;
       color: var(--text);
       font-family: var(--font-small);
       font-size: 13px;
@@ -117,36 +107,36 @@
       user-select: none;
       perspective: 1200px;
       perspective-origin: center center;
+      transform: translateZ(0);
     }
 
     button, input, select { font-family: var(--font-ui); }
     button { cursor: pointer; }
     button:focus-visible, input:focus-visible { outline: 3px solid #ffffff; outline-offset: 3px; }
 
-    /* CRT Scanline Overlay */
+    /* CRT Scanline Overlay (Hardware-Cached Composite Layer) */
     .crt-overlay {
       position: fixed; inset: 0; z-index: 9999; pointer-events: none;
       background:
         linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.22) 50%),
         linear-gradient(90deg, rgba(255, 0, 0, 0.025), rgba(0, 255, 0, 0.012), rgba(0, 0, 255, 0.025));
       background-size: 100% 3px, 6px 100%;
+      will-change: transform;
+      transform: translateZ(0);
+      backface-visibility: hidden;
     }
 
-    /* Animated Felt Table Background */
+    /* Animated Felt Table Background (GPU-Accelerated drift layer) */
     .felt-table {
       background-color: #080d16;
-      background-image:
-        radial-gradient(circle at 50% 50%, rgba(20, 32, 51, 0.35) 0%, rgba(6, 10, 16, 0.88) 100%),
-        conic-gradient(
-          #142033 90deg,
-          #080d16 90deg 180deg,
-          #142033 180deg 270deg,
-          #080d16 270deg
-        );
-      background-size: 100% 100%, 64px 64px;
-      animation: felt-bg-scroll 28s linear infinite;
+      background-image: radial-gradient(circle at 50% 50%, rgba(20, 32, 51, 0.45) 0%, rgba(6, 10, 16, 0.92) 100%);
       position: relative;
       box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.75);
+      overflow: hidden;
+      will-change: transform;
+      transform: translateZ(0);
+      transform-style: preserve-3d;
+      backface-visibility: hidden;
     }
     .felt-table::before {
       content: "";
@@ -154,6 +144,26 @@
       background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 0);
       background-size: 16px 16px;
       pointer-events: none;
+      z-index: 1;
+    }
+    .felt-table::after {
+      content: "";
+      position: absolute;
+      top: -64px; left: -64px;
+      width: calc(100% + 128px);
+      height: calc(100% + 128px);
+      background-image: conic-gradient(
+        #142033 90deg,
+        #080d16 90deg 180deg,
+        #142033 180deg 270deg,
+        #080d16 270deg
+      );
+      background-size: 64px 64px;
+      opacity: 0.35;
+      pointer-events: none;
+      z-index: 0;
+      will-change: transform;
+      animation: felt-gpu-drift 28s linear infinite;
     }
 
     /* Arcade Box Styles */
@@ -252,16 +262,19 @@
           #060910 270deg
         );
       background-size: 100% 100%, 64px 64px;
-      animation: felt-bg-scroll 28s linear infinite;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s ease;
+      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s ease, visibility 0.8s;
       overflow: hidden;
       cursor: pointer;
+      visibility: visible;
+      will-change: opacity, transform;
+      transform: translateZ(0);
     }
     .intro-menu-black.is-hidden {
       opacity: 0;
       transform: scale(1.05);
       pointer-events: none;
+      visibility: hidden;
     }
 
     .intro-click-prompt {
@@ -761,7 +774,7 @@
     }
 
     /* TOP SECTION: 5 JOKER SLOTS */
-    .jokers-section { width: 100%; }
+    .jokers-section { width: 100%; position: relative; z-index: 2; }
     .jokers-heading {
       display: flex; justify-content: space-between; align-items: center;
       margin-bottom: 6px; padding: 0 4px;
@@ -808,14 +821,17 @@
       transition: transform 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.18s ease;
       cursor: pointer;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+      will-change: transform;
+      transform: translateZ(0);
+      backface-visibility: hidden;
     }
     .joker-card:hover {
-      transform: translateY(-8px) scale(1.05);
+      transform: translateY(-8px) scale(1.05) translateZ(0);
       box-shadow: 0 12px 24px rgba(0, 0, 0, 0.8), 0 0 14px rgba(255, 255, 255, 0.3);
       z-index: 25;
     }
 
-    /* Holographic animated shine on jokers */
+    /* Holographic animated shine on jokers (Hardware-accelerated) */
     .joker-card::after {
       content: '';
       position: absolute;
@@ -827,13 +843,15 @@
         rgba(255, 255, 255, 0.12) 50%,
         transparent 80%
       );
-      transform: rotate(30deg);
+      transform: rotate(30deg) translateZ(0);
       animation: shine 4s infinite linear;
       pointer-events: none;
+      will-change: transform;
+      backface-visibility: hidden;
     }
     @keyframes shine {
-      0% { transform: translateY(-100%) rotate(30deg); }
-      100% { transform: translateY(100%) rotate(30deg); }
+      0% { transform: translateY(-100%) rotate(30deg) translateZ(0); }
+      100% { transform: translateY(100%) rotate(30deg) translateZ(0); }
     }
 
     /* Joker rarity borders */
@@ -1081,14 +1099,17 @@
       box-shadow: 0 6px 14px rgba(0, 0, 0, 0.6);
       transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease;
       cursor: pointer;
+      will-change: transform;
+      transform: translateZ(0);
+      backface-visibility: hidden;
     }
     .playing-card:hover {
-      transform: translateY(-16px) scale(1.06);
+      transform: translateY(-16px) scale(1.06) translateZ(0);
       z-index: 20;
       box-shadow: 0 0 14px #fff, 0 16px 24px rgba(0, 0, 0, 0.7);
     }
     .playing-card.is-selected {
-      transform: translateY(-22px) scale(1.08);
+      transform: translateY(-22px) scale(1.08) translateZ(0);
       outline: 3px solid #ffffff;
       outline-offset: 2px;
       box-shadow: 0 0 18px #ffffff, 0 16px 24px rgba(0, 0, 0, 0.7);
@@ -1444,6 +1465,8 @@
       flex-direction: column;
       justify-content: space-between;
       flex: 1;
+      position: relative;
+      z-index: 2;
       transition: opacity 0.3s ease, transform 0.3s ease;
     }
     .table-view.is-hidden {
@@ -2020,8 +2043,9 @@
     body[data-anim-quality="low"] {
       animation: none !important;
     }
-    body[data-anim-quality="low"] .felt-table {
+    body[data-anim-quality="low"] .felt-table::after {
       animation: none !important;
+      display: none !important;
     }
     body[data-anim-quality="low"] .intro-cards-fan {
       animation: none !important;
@@ -2034,8 +2058,8 @@
       box-shadow: none !important;
       transition: none !important;
     }
-    body[data-anim-quality="medium"] .felt-table {
-      animation-duration: 40s !important;
+    body[data-anim-quality="medium"] .felt-table::after {
+      animation-duration: 45s !important;
     }
   
     .joker-desc-short {
@@ -2343,8 +2367,8 @@
           <button class="button button-quiet arcade-btn" id="toggleRulesButton" type="button">REGLAS</button>
           <button class="button button-quiet arcade-btn" id="openSettingsButton" type="button">CONFIG</button>
           <button class="button button-quiet arcade-btn" id="openCreditsButton" type="button">CRÉDITOS</button>
-          <button class="button button-quiet arcade-btn" id="openDebugButton" type="button" style="color: #ff9f43; font-weight: 700;">DEBUG</button>
-          <button class="button button-quiet arcade-btn" id="restartButton" type="button" style="color: var(--red);">REINICIAR</button>
+          <button class="button button-quiet arcade-btn" id="openDebugButton" type="button" style="display: none;" aria-hidden="true" tabindex="-1">DEBUG</button>
+          <button class="button button-quiet arcade-btn" id="restartButton" type="button" style="color: var(--red); grid-column: 1 / -1;">REINICIAR</button>
         </div>
       </div>
     </aside>

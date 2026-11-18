@@ -5,6 +5,33 @@ import { createDefaultRules, mergeRules, validateRules } from "../core/rules.js"
 import { formatEvent, formatMoney, renderGame, triggerToast, cardName } from "./render.js";
 import { envidoTanto } from "../core/envido.js";
 
+// Safe local storage helper for sandboxed iframes (e.g. itch.io)
+const storage = {
+  get(key, fallback = null) {
+    try {
+      if (typeof window === "undefined" || !window.localStorage) return fallback;
+      const v = window.localStorage.getItem(key);
+      return v !== null && v !== undefined ? v : fallback;
+    } catch {
+      return fallback;
+    }
+  },
+  set(key, val) {
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        window.localStorage.setItem(key, String(val));
+      }
+    } catch {}
+  },
+  remove(key) {
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        window.localStorage.removeItem(key);
+      }
+    } catch {}
+  }
+};
+
 const elements = {
   score: document.querySelector("#scoreValue"),
   goal: document.querySelector("#scoreGoal"),
@@ -239,11 +266,7 @@ const SFX = {
   _masterVol: 0.55,     // global SFX volume, overridden by settings slider
   sources: {
     card: ["assets/audio/SFX/card_slide.wav"],
-    button: [
-      "assets/audio/SFX/button.mp3",
-      "assets/audio/SFX/button_click.wav",
-      "assets/audio/SFX/button.wav"
-    ],
+    button: ["assets/audio/SFX/button.mp3"],
     info: ["assets/audio/SFX/info_msg.mp3"],
     lose: ["assets/audio/SFX/lose.mp3"],
     win: ["assets/audio/SFX/win.mp3"],
@@ -446,7 +469,7 @@ function showOutcomeModal(type, eventData, options = {}) {
     }
     if (lbBox) {
       lbBox.hidden = false;
-      const savedTag = localStorage.getItem("trucolite_player_tag") || "";
+      const savedTag = storage.get("trucolite_player_tag", "");
       if (elements.leaderboardNameInput) elements.leaderboardNameInput.value = savedTag;
     }
     overlay.dataset.nextAction = "restart";
@@ -1397,20 +1420,17 @@ function renderDeckViewer(sortMode) {
       cardEl.title = `Clic para aplicar mejora: ${pendingUpgradeItem.name}\n${cardEl.title}`;
       cardEl.addEventListener("click", () => {
         const cName = cardName(card);
-        const confirmed = window.confirm(`¿Estás seguro de aplicar "${pendingUpgradeItem.name}" a ${cName}?`);
-        if (confirmed) {
-          const itemToApply = pendingUpgradeItem;
-          pendingUpgradeItem = null;
-          deckUpgradeMode = false;
-          const title = document.querySelector("#deckDialogTitle");
-          if (title) {
-            title.textContent = "MAZO COMPLETO (40 CARTAS)";
-            title.style.color = "var(--blue)";
-          }
-          elements.deckDialog.close();
-          applyAction({ type: "BUY_ITEM", itemId: itemToApply.id, cardId: card.id });
-          triggerToast(`¡"${itemToApply.name}" aplicada a ${cName}!`, "gold");
+        const itemToApply = pendingUpgradeItem;
+        pendingUpgradeItem = null;
+        deckUpgradeMode = false;
+        const title = document.querySelector("#deckDialogTitle");
+        if (title) {
+          title.textContent = "MAZO COMPLETO (40 CARTAS)";
+          title.style.color = "var(--blue)";
         }
+        elements.deckDialog.close();
+        applyAction({ type: "BUY_ITEM", itemId: itemToApply.id, cardId: card.id });
+        triggerToast(`¡"${itemToApply.name}" aplicada a ${cName}!`, "gold");
       });
     }
 
@@ -1572,8 +1592,8 @@ if (elements.outcomeRestart) {
 // HALL OF FAME / LEADERBOARD (LOCALSTORAGE PERSISTENCE)
 // ========================================================
 function getLeaderboard() {
+  const raw = storage.get("trucolite_hall_of_fame");
   try {
-    const raw = localStorage.getItem("trucolite_hall_of_fame");
     return raw ? JSON.parse(raw) : [];
   } catch (e) {
     return [];
@@ -1582,7 +1602,7 @@ function getLeaderboard() {
 
 function saveToLeaderboard(tag, level, score, seed) {
   const cleanTag = (tag || "CRIOLLO").trim().toUpperCase().slice(0, 5) || "TRUCO";
-  try { localStorage.setItem("trucolite_player_tag", cleanTag); } catch (e) {}
+  storage.set("trucolite_player_tag", cleanTag);
 
   const records = getLeaderboard();
   const newEntry = {
@@ -1597,9 +1617,7 @@ function saveToLeaderboard(tag, level, score, seed) {
   // Sort: Level desc, then score desc
   records.sort((a, b) => (b.level - a.level) || (b.score - a.score));
   const top10 = records.slice(0, 10);
-  try {
-    localStorage.setItem("trucolite_hall_of_fame", JSON.stringify(top10));
-  } catch (e) {}
+  storage.set("trucolite_hall_of_fame", JSON.stringify(top10));
   return top10;
 }
 
@@ -1690,13 +1708,25 @@ if (elements.closeLeaderboardButton && elements.leaderboardDialog) {
 if (elements.closeLeaderboardButton2 && elements.leaderboardDialog) {
   elements.closeLeaderboardButton2.addEventListener("click", () => elements.leaderboardDialog.close());
 }
+let clearLeaderboardPending = false;
+let clearLeaderboardTimer = null;
 if (elements.clearLeaderboardButton) {
   elements.clearLeaderboardButton.addEventListener("click", () => {
-    if (confirm("¿Estás seguro de que querés borrar todos los récords locales?")) {
-      try { localStorage.removeItem("trucolite_hall_of_fame"); } catch (e) {}
-      renderLeaderboardTable();
-      notify("Historial de récords limpiado", "info");
+    if (!clearLeaderboardPending) {
+      clearLeaderboardPending = true;
+      elements.clearLeaderboardButton.textContent = "¿CONFIRMAR BORRADO?";
+      clearLeaderboardTimer = setTimeout(() => {
+        clearLeaderboardPending = false;
+        elements.clearLeaderboardButton.textContent = "BORRAR HISTORIAL";
+      }, 3500);
+      return;
     }
+    clearLeaderboardPending = false;
+    clearTimeout(clearLeaderboardTimer);
+    elements.clearLeaderboardButton.textContent = "BORRAR HISTORIAL";
+    storage.remove("trucolite_hall_of_fame");
+    renderLeaderboardTable();
+    notify("Historial de récords limpiado", "info");
   });
 }
 
@@ -2149,7 +2179,7 @@ function startTour() {
 function endTour() {
   document.querySelectorAll(".tour-highlight").forEach(el => el.classList.remove("tour-highlight"));
   if (elements.tourPopover) elements.tourPopover.hidden = true;
-  try { localStorage.setItem("trucolite_tutorial_seen", "true"); } catch (e) {}
+  storage.set("trucolite_tutorial_seen", "true");
 }
 
 if (elements.tourNextBtn) {
@@ -2293,17 +2323,19 @@ if (!intro.menu) {
 }
 
 // ========================================================
-// BALATRO-STYLE 3D PARALLAX MOUSE TRACKING
+// BALATRO-STYLE 3D PARALLAX MOUSE TRACKING (GPU-OPTIMIZED)
 // ========================================================
 let parallaxEnabled = true;
+let wakeParallax = () => {};
 
 function initParallaxTracking() {
   if (typeof window === "undefined" || !window.matchMedia) return;
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-  const appContainer = document.querySelector(".app-container");
+  const tiltTarget = document.querySelector(".table-main") || document.querySelector(".app-container");
   const introHero = document.querySelector(".intro-hero-stage");
   const introCards = document.querySelector(".intro-cards-fan");
+  const introMenu = document.querySelector("#introMenu");
 
   let targetNormX = 0;
   let targetNormY = 0;
@@ -2311,52 +2343,88 @@ function initParallaxTracking() {
   let currentTiltY = 0;
   let currentShiftX = 0;
   let currentShiftY = 0;
+  let isTicking = false;
+
+  function renderParallax() {
+    const targetTiltX = parallaxEnabled ? -targetNormY * 2.2 : 0;
+    const targetTiltY = parallaxEnabled ? targetNormX * 2.2 : 0;
+    const targetShiftX = parallaxEnabled ? targetNormX * 5 : 0;
+    const targetShiftY = parallaxEnabled ? targetNormY * 5 : 0;
+
+    currentTiltX += (targetTiltX - currentTiltX) * 0.12;
+    currentTiltY += (targetTiltY - currentTiltY) * 0.12;
+    currentShiftX += (targetShiftX - currentShiftX) * 0.12;
+    currentShiftY += (targetShiftY - currentShiftY) * 0.12;
+
+    const delta = Math.abs(targetTiltX - currentTiltX) + 
+                  Math.abs(targetTiltY - currentTiltY) + 
+                  Math.abs(targetShiftX - currentShiftX) + 
+                  Math.abs(targetShiftY - currentShiftY);
+
+    if (delta < 0.008) {
+      currentTiltX = targetTiltX;
+      currentTiltY = targetTiltY;
+      currentShiftX = targetShiftX;
+      currentShiftY = targetShiftY;
+    }
+
+    if (tiltTarget) {
+      if (currentTiltX === 0 && currentTiltY === 0 && currentShiftX === 0 && currentShiftY === 0) {
+        tiltTarget.style.transform = "";
+      } else {
+        tiltTarget.style.transform = `perspective(1200px) rotateX(${currentTiltX.toFixed(2)}deg) rotateY(${currentTiltY.toFixed(2)}deg) translate3d(${currentShiftX.toFixed(1)}px, ${currentShiftY.toFixed(1)}px, 0)`;
+      }
+    }
+
+    // Only update intro elements when intro menu is actually visible
+    if (introMenu && !introMenu.classList.contains("is-hidden")) {
+      if (introHero) {
+        const heroTiltX = parallaxEnabled ? -targetNormY * 3.5 : 0;
+        const heroTiltY = parallaxEnabled ? targetNormX * 3.5 : 0;
+        introHero.style.transform = `perspective(800px) rotateX(${heroTiltX.toFixed(2)}deg) rotateY(${heroTiltY.toFixed(2)}deg)`;
+      }
+      if (introCards) {
+        const cardShiftX = parallaxEnabled ? -targetNormX * 14 : 0;
+        const cardShiftY = parallaxEnabled ? -targetNormY * 9 : 0;
+        introCards.style.transform = `translate3d(${cardShiftX.toFixed(2)}px, ${cardShiftY.toFixed(2)}px, 0)`;
+      }
+    }
+
+    if (delta >= 0.008) {
+      requestAnimationFrame(renderParallax);
+    } else {
+      isTicking = false;
+    }
+  }
+
+  function requestTick() {
+    if (!isTicking) {
+      isTicking = true;
+      requestAnimationFrame(renderParallax);
+    }
+  }
+
+  wakeParallax = () => {
+    targetNormX = 0;
+    targetNormY = 0;
+    requestTick();
+  };
 
   window.addEventListener("mousemove", (e) => {
     const w = window.innerWidth || 1;
     const h = window.innerHeight || 1;
     targetNormX = Math.max(-1, Math.min(1, (e.clientX / w - 0.5) * 2));
     targetNormY = Math.max(-1, Math.min(1, (e.clientY / h - 0.5) * 2));
+    requestTick();
   }, { passive: true });
 
   window.addEventListener("mouseleave", () => {
     targetNormX = 0;
     targetNormY = 0;
+    requestTick();
   }, { passive: true });
 
-  function renderParallax() {
-    if (!parallaxEnabled) {
-      currentTiltX += (0 - currentTiltX) * 0.1;
-      currentTiltY += (0 - currentTiltY) * 0.1;
-      currentShiftX += (0 - currentShiftX) * 0.1;
-      currentShiftY += (0 - currentShiftY) * 0.1;
-    } else {
-      currentTiltX += (-targetNormY * 2.2 - currentTiltX) * 0.08;
-      currentTiltY += (targetNormX * 2.2 - currentTiltY) * 0.08;
-      currentShiftX += (targetNormX * 5 - currentShiftX) * 0.08;
-      currentShiftY += (targetNormY * 5 - currentShiftY) * 0.08;
-    }
-
-    if (appContainer) {
-      appContainer.style.transform = `perspective(1200px) rotateX(${currentTiltX.toFixed(3)}deg) rotateY(${currentTiltY.toFixed(3)}deg) translate3d(${currentShiftX.toFixed(2)}px, ${currentShiftY.toFixed(2)}px, 0)`;
-    }
-
-    if (introHero) {
-      const heroTiltX = parallaxEnabled ? -targetNormY * 3.5 : 0;
-      const heroTiltY = parallaxEnabled ? targetNormX * 3.5 : 0;
-      introHero.style.transform = `perspective(800px) rotateX(${heroTiltX.toFixed(2)}deg) rotateY(${heroTiltY.toFixed(2)}deg)`;
-    }
-
-    if (introCards) {
-      const cardShiftX = parallaxEnabled ? -targetNormX * 14 : 0;
-      const cardShiftY = parallaxEnabled ? -targetNormY * 9 : 0;
-      introCards.style.transform = `translate3d(${cardShiftX.toFixed(2)}px, ${cardShiftY.toFixed(2)}px, 0)`;
-    }
-
-    requestAnimationFrame(renderParallax);
-  }
-
-  requestAnimationFrame(renderParallax);
+  requestTick();
 }
 
 initParallaxTracking();
@@ -2428,6 +2496,7 @@ initParallaxTracking();
   if (parallaxCheck) {
     parallaxCheck.addEventListener("change", () => {
       parallaxEnabled = parallaxCheck.checked;
+      wakeParallax();
     });
   }
 
@@ -2455,6 +2524,7 @@ initParallaxTracking();
       if (reduceMotion.checked && parallaxCheck) {
         parallaxCheck.checked = false;
         parallaxEnabled = false;
+        wakeParallax();
       }
     });
   }
@@ -2481,7 +2551,7 @@ initParallaxTracking();
   const animQualitySel = document.querySelector("#settingsAnimQuality");
   function setAnimQuality(quality) {
     document.body.dataset.animQuality = quality;
-    try { localStorage.setItem("trucolite_anim_quality", quality); } catch (e) {}
+    storage.set("trucolite_anim_quality", quality);
     if (animQualitySel) animQualitySel.value = quality;
 
     const bodyEl = document.body;
@@ -2493,23 +2563,26 @@ initParallaxTracking();
       if (bodyEl) bodyEl.style.animationPlayState = "paused";
       if (tableEl) tableEl.style.animationPlayState = "paused";
       if (crtCheck) { crtCheck.checked = false; if (crtOverlay) crtOverlay.style.display = "none"; }
+      wakeParallax();
     } else if (quality === "medium") {
       parallaxEnabled = true;
       if (parallaxCheck) parallaxCheck.checked = true;
       if (bodyEl) bodyEl.style.animationPlayState = "running";
       if (tableEl) tableEl.style.animationPlayState = "running";
+      wakeParallax();
     } else {
       parallaxEnabled = true;
       if (parallaxCheck) parallaxCheck.checked = true;
       if (bodyEl) bodyEl.style.animationPlayState = "running";
       if (tableEl) tableEl.style.animationPlayState = "running";
       if (crtCheck && crtCheck.checked && crtOverlay) crtOverlay.style.display = "";
+      wakeParallax();
     }
   }
 
   if (animQualitySel) {
     animQualitySel.addEventListener("change", (e) => setAnimQuality(e.target.value));
-    const savedQuality = localStorage.getItem("trucolite_anim_quality") || "high";
+    const savedQuality = storage.get("trucolite_anim_quality", "high");
     setAnimQuality(savedQuality);
   }
 
@@ -2615,13 +2688,13 @@ initParallaxTracking();
     const tutOpen = document.querySelector("#tutorialOpenButton");
     if (tutOpen) tutOpen.textContent = dict.btn_how_to_play;
 
-    try { localStorage.setItem("trucolite_lang", lang); } catch (e) {}
+    storage.set("trucolite_lang", lang);
     if (langSel) langSel.value = lang;
   }
 
   if (langSel) {
     langSel.addEventListener("change", (e) => setLanguage(e.target.value));
-    const savedLang = localStorage.getItem("trucolite_lang") || "es";
+    const savedLang = storage.get("trucolite_lang", "es");
     setLanguage(savedLang);
   }
 
