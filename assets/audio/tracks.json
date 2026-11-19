@@ -1,0 +1,34 @@
+{
+  "menu": {
+    "title": "Trucolite",
+    "file": "assets/audio/trucolite.mp3",
+    "description": "Música del menú principal"
+  },
+  "playlist": [
+    {
+      "id": "beginners-luck",
+      "title": "Beginner's Luck",
+      "file": "assets/audio/beginners-luck.mp3"
+    },
+    {
+      "id": "card-and-mind",
+      "title": "Card & Mind",
+      "file": "assets/audio/card-and-mind.mp3"
+    },
+    {
+      "id": "pixels-pixels-pixels",
+      "title": "Pixels Pixels Pixels",
+      "file": "assets/audio/pixels-pixels-pixels.mp3"
+    },
+    {
+      "id": "thinking-outside-the-box",
+      "title": "Thinking outside the box or Boxes outside of thinking",
+      "file": "assets/audio/thinking-outside-the-box.mp3"
+    },
+    {
+      "id": "till-infinity",
+      "title": "Till Infinity",
+      "file": "assets/audio/till-infinity.mp3"
+    }
+  ]
+}

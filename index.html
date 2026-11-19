@@ -245,7 +245,7 @@
       box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
     }
     .button-next { display: none; }
-    .button-next.is-visible { display: inline-flex; }
+    .button-next.is-visible { display: none !important; }
 
     /* ========================================================
        CINEMATIC PITCH-BLACK INTRO MENU STYLES
@@ -693,16 +693,19 @@
 
     /* Money Box */
     .money-box {
-      background: rgba(255, 255, 255, 0.06);
-      border: 2px solid rgba(255, 255, 255, 0.25);
+      background: rgba(254, 202, 87, 0.10);
+      border: 2px solid rgba(254, 202, 87, 0.45);
+      box-shadow: 0 0 12px rgba(254, 202, 87, 0.18);
       border-radius: 8px;
       padding: 7px 12px;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
-    .money-label { font-family: var(--font-small); font-size: 12px; color: #ffffff; font-weight: 700; letter-spacing: 0.08em; }
-    .money-val { font-family: var(--font-ui); font-size: 22px; font-weight: 700; color: #ffffff; text-shadow: 0 0 8px rgba(255, 255, 255, 0.4); }
+    .money-label { font-family: var(--font-small); font-size: 12px; color: #feca57; font-weight: 700; letter-spacing: 0.08em; }
+    .money-val { font-family: var(--font-ui); font-size: 22px; font-weight: 700; color: #feca57; text-shadow: 0 0 8px rgba(254, 202, 87, 0.4); }
+
+
 
     /* BGM Audio Controller Widget (In-game music) */
     .audio-widget {
@@ -1226,7 +1229,7 @@
       padding: 12px 16px;
       border: 2px solid #ffffff;
       border-radius: 10px;
-      background: rgba(10, 14, 20, 0.98);
+      background: rgba(10, 14, 20, 0.70);
       color: #fff;
       box-shadow: 0 0 18px rgba(255, 255, 255, 0.3), 0 10px 28px rgba(0, 0, 0, 0.85);
       font-family: var(--font-small);
@@ -2204,7 +2207,7 @@
 
   <!-- Menu Music Track (menu_main.mp3 - Only in intro) -->
   <audio id="menuAudio" loop preload="auto">
-    <source src="assets/audio/menu_main.mp3" type="audio/mpeg">
+    <source src="assets/audio/trucolite.mp3" type="audio/mpeg">
   </audio>
   <!-- BGM layers are created dynamically by the BGM system in main.js -->
 
@@ -2253,9 +2256,7 @@
           <button id="introTutorialBtn" class="arcade-btn button button-quiet" type="button">
             REGLAS
           </button>
-          <button id="introDeckBtn" class="arcade-btn button button-quiet" type="button">
-            VER MAZO
-          </button>
+
           <button id="introLeaderboardBtn" class="arcade-btn button button-quiet" type="button">
             RÉCORDS
           </button>
@@ -2350,12 +2351,14 @@
         <!-- Compact Music Volume Control -->
         <div class="audio-widget" id="bgmWidget">
           <div class="audio-widget-top">
-            <span>🎵 MÚSICA</span>
+            <span class="audio-title" id="bgmTrackTitle">🎵 Beginner's Luck</span>
             <span id="bgmZoneBadge" class="audio-status-badge">● MÚSICA</span>
           </div>
           <div class="audio-controls-row">
+            <button class="arcade-btn audio-nav-btn" id="bgmPrevBtn" type="button" title="Pista anterior">⏮</button>
             <button class="arcade-btn audio-btn" id="bgmToggle" type="button">PAUSAR</button>
-            <input type="range" class="audio-slider" id="bgmVolume" min="0" max="100" value="35" title="Volumen de música">
+            <button class="arcade-btn audio-nav-btn" id="bgmNextBtn" type="button" title="Siguiente pista">⏭</button>
+            <input type="range" class="audio-slider" id="bgmVolume" min="0" max="100" value="50" title="Volumen de música">
           </div>
         </div>
 
@@ -2364,7 +2367,7 @@
           <button class="button button-quiet arcade-btn" id="returnToMenuBtn" type="button" style="color: #feca57; font-weight: 700;">MENÚ</button>
           <button class="button button-quiet arcade-btn" id="tutorialOpenButton" type="button">CÓMO JUGAR</button>
           <button class="button button-quiet arcade-btn" id="openLeaderboardButton" type="button">RÉCORDS</button>
-          <button class="button button-quiet arcade-btn" id="toggleRulesButton" type="button">REGLAS</button>
+          <button class="button button-quiet arcade-btn" id="toggleRulesButton" type="button" style="display: none;">REGLAS</button>
           <button class="button button-quiet arcade-btn" id="openSettingsButton" type="button">CONFIG</button>
           <button class="button button-quiet arcade-btn" id="openCreditsButton" type="button">CRÉDITOS</button>
           <button class="button button-quiet arcade-btn" id="openDebugButton" type="button" style="display: none;" aria-hidden="true" tabindex="-1">DEBUG</button>
@@ -2415,9 +2418,7 @@
           <div class="round-outcome" id="roundOutcome" role="status" aria-live="polite" hidden>
             <strong id="roundOutcomeTitle"></strong>
             <span id="roundOutcomeDetails"></span>
-            <button class="button button-primary arcade-btn outcome-next-round-btn" id="outcomeNextRoundButton" type="button">
-              SIGUIENTE RONDA ➔
-            </button>
+
           </div>
         </section>
 
@@ -2444,7 +2445,7 @@
             <button class="button btn-play-card arcade-btn" id="actionButton" type="button" disabled>JUGAR CARTA ➔</button>
             <button class="button btn-discard-card arcade-btn" id="discardActionButton" type="button" disabled>DESCARTAR ➔</button>
             <button class="button btn-tanto arcade-btn" id="showTantoButton" type="button">VER TANTO</button>
-            <button class="button button-primary arcade-btn button-next" id="nextRoundButton" type="button">SIGUIENTE RONDA ➔</button>
+            <button class="button button-primary arcade-btn button-next" id="nextRoundButton" type="button" style="display: none !important;" aria-hidden="true" tabindex="-1">SIGUIENTE RONDA ➔</button>
           </div>
 
           <!-- Player Hand -->
@@ -2463,7 +2464,7 @@
           <!-- Balatro Neon Shop Marquee Sign -->
           <div class="shop-marquee-banner">
             <div class="shop-marquee-title">SHOP</div>
-            <div class="shop-marquee-sub">¡MEJORA TU RUN! · NIVEL <span id="shopLevel">1</span> · <span id="shopMoney">$0</span></div>
+            <div class="shop-marquee-sub">¡MEJORA TU RUN! · NIVEL <span id="shopLevel">1</span> · <span id="shopMoney" style="color: #feca57; font-weight: 700;">$0</span></div>
           </div>
 
           <!-- Main Shop Row: Left Actions + Right Offers -->
@@ -2700,7 +2701,8 @@
         <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid var(--border); border-radius: 8px; padding: 10px;">
           <h3 style="margin: 0 0 4px; font-family: var(--font-ui); font-size: 13px; color: #2ed573;">04 · ENVIDO Y FLOR (TANTOS DE MANO)</h3>
           <p style="margin: 0; color: var(--text-dim); font-size: 11px; line-height: 1.4;">
-            Se cantan <strong>antes de jugar tu primera carta</strong>. Dos cartas del mismo palo suman 20 + sus números (las figuras 10, 11 y 12 valen 0). El máximo es 33 (7+6+20). <strong>Flor</strong> requiere 3 cartas del mismo palo y otorga bono directo.
+            Se cantan <strong>antes de jugar tu primera carta</strong>. Dos cartas del mismo palo suman 20 + sus números (las figuras 10, 11 y 12 valen 0). El máximo es 33 (7+6+20).<br>
+            <strong style="color: #feca57;">¡Economía en juego!</strong> Disputar el Envido tiene impacto directo en tu dinero: ganar te otorga <strong>+$1</strong>, pero perderlo te descuenta <strong>-$1</strong> de tu billetera. <strong>Flor</strong> requiere 3 cartas del mismo palo y otorga bono directo.
           </p>
         </div>
       </div>
@@ -2712,6 +2714,7 @@
           <li><span class="tutorial-num">02</span><div><strong>Cambios de carta</strong><p style="margin: 2px 0 0; color: var(--text-dim); font-size: 11px;">Podés descartar y robar cartas nuevas del mazo antes de jugar tu primera carta de la ronda.</p></div></li>
           <li><span class="tutorial-num">03</span><div><strong>Cómo obtener tantos</strong><p style="margin: 2px 0 0; color: var(--blue); font-size: 11px; font-weight: 700;">fichas × mult (cantos) × xmult (truco) = tantos ganados</p></div></li>
           <li><span class="tutorial-num">04</span><div><strong>Comodines Truqueros</strong><p style="margin: 2px 0 0; color: var(--text-dim); font-size: 11px;">Tenés 5 ranuras para comodines que potencian tus palos, tus 7s y tus cantos para armar sinergias rotas.</p></div></li>
+          <li><span class="tutorial-num">05</span><div><strong>Economía, Envido y Deuda</strong><p style="margin: 2px 0 0; color: #feca57; font-size: 11px;">El Envido pone plata en juego (+$$1 si ganás, -$$1 si perdés). Podés endeudarte hasta -$$50 antes de perder la run automáticamente.</p></div></li>
         </ol>
       </div>
 
@@ -2742,15 +2745,15 @@
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
             <label for="settingsMusicVol" style="font-family: var(--font-small); font-size: 12px; color: #fff;" data-i18n="settings_music">🎵 Música</label>
             <div style="display: flex; align-items: center; gap: 8px;">
-              <input type="range" id="settingsMusicVol" min="0" max="100" value="35" style="width: 110px; accent-color: #ffffff;">
-              <span id="settingsMusicVolVal" style="font-family: var(--font-small); font-size: 11px; color: var(--text-dim); width: 32px; text-align: right;">35%</span>
+              <input type="range" id="settingsMusicVol" min="0" max="100" value="50" style="width: 110px; accent-color: #ffffff;">
+              <span id="settingsMusicVolVal" style="font-family: var(--font-small); font-size: 11px; color: var(--text-dim); width: 32px; text-align: right;">50%</span>
             </div>
           </div>
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
             <label for="settingsSfxVol" style="font-family: var(--font-small); font-size: 12px; color: #fff;" data-i18n="settings_sfx">🔊 Efectos (SFX)</label>
             <div style="display: flex; align-items: center; gap: 8px;">
-              <input type="range" id="settingsSfxVol" min="0" max="100" value="55" style="width: 110px; accent-color: #ffffff;">
-              <span id="settingsSfxVolVal" style="font-family: var(--font-small); font-size: 11px; color: var(--text-dim); width: 32px; text-align: right;">55%</span>
+              <input type="range" id="settingsSfxVol" min="0" max="100" value="50" style="width: 110px; accent-color: #ffffff;">
+              <span id="settingsSfxVolVal" style="font-family: var(--font-small); font-size: 11px; color: var(--text-dim); width: 32px; text-align: right;">50%</span>
             </div>
           </div>
         </div>

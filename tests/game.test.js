@@ -42,12 +42,12 @@ test("card tooltip totals matching upgrades and suit/rank joker effects", () => 
     ]
   };
   assert.deepEqual(cardModifierSummary(card, state), [
-    "Fuerza de baza: 4 (no suma directamente al puntaje)",
+    "Fuerza de baza: 4",
     "Puntaje real = 4 + 18 chips + 2 mult",
-    "Puntaje base: +3 fichas por baza ganada (suman si ganás la ronda)",
-    "Modificador: +18 fichas (si ganás la ronda)",
+    "Puntaje base: +3 fichas por baza ganada",
+    "Modificador: +18 fichas",
     "Modificador: +2 al multiplicador",
-    "Dinero: +$5 al resolver la ronda, aunque la pierdas",
+    "Dinero: +$5",
     "Mejora Brillo de cobre: La carta marcada suma +8 fichas cuando la jugás.",
     "Mejora Tinta de canto: La carta marcada suma +2 al multiplicador cuando la jugás.",
     "Mejora Cara acuñada: Ganás +$2 cada vez que jugás la carta marcada.",

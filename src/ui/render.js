@@ -32,7 +32,7 @@ const SUIT_ICONS = {
   copas: "🍷"
 };
 
-const CANTO_NAMES = {
+export const CANTO_NAMES = {
   envido: "Envido",
   flor: "Flor",
   truco: "Truco",
@@ -59,6 +59,10 @@ export function cardName(card) {
 }
 
 export function formatMoney(value) {
+  if (value < 0) {
+    const abs = Math.abs(value);
+    return "-" + (Number.isInteger(abs) ? String(abs) : abs.toFixed(2).replace(".", ","));
+  }
   return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(".", ",");
 }
 
@@ -153,13 +157,13 @@ export function cardModifierSummary(card, state) {
   }
 
   const lines = [
-    `Fuerza de baza: ${power} (no suma directamente al puntaje)`,
+    `Fuerza de baza: ${power}`,
     realScoreText,
-    `Puntaje base: +${state.rules.chipsPerTrick} fichas por baza ganada (suman si ganás la ronda)`
+    `Puntaje base: +${state.rules.chipsPerTrick} fichas por baza ganada`
   ];
-  if (chips.length) lines.push(`Modificador: +${fmt(totalChips)} fichas (si ganás la ronda)`);
+  if (chips.length) lines.push(`Modificador: +${fmt(totalChips)} fichas`);
   if (mults.length) lines.push(`Modificador: +${fmt(totalMult)} al multiplicador`);
-  if (money.length) lines.push(`Dinero: +$${fmt(sum(money))} al resolver la ronda, aunque la pierdas`);
+  if (money.length) lines.push(`Dinero: +$${fmt(sum(money))}`);
   lines.push(...modifierDetails);
   return lines;
 }
@@ -206,6 +210,7 @@ function playerCardButton(card, selected, state) {
   }, { once: true });
   button.append(image, fallback);
   addUpgradeSeals(button, card, state);
+
   return button;
 }
 
@@ -330,7 +335,8 @@ export function formatEvent(item) {
     return `Cambiaste ${item.discarded.length} carta${item.discarded.length === 1 ? "" : "s"}.`;
   }
   if (item.type === "ENVIDO_RESOLVED") {
-    return `Envido: vos ${item.playerTanto}, Rival ${item.rivalTanto}. ${item.winner === "player" ? "Ganaste." : "Ganó el Rival."}`;
+    const moneyStr = item.moneyDelta > 0 ? " (+$" + item.moneyDelta + ")" : (item.moneyDelta < 0 ? " (-$" + Math.abs(item.moneyDelta) + ")" : "");
+    return `Envido: vos ${item.playerTanto}, Rival ${item.rivalTanto}. ${item.winner === "player" ? "Ganaste" : "Ganó el Rival"}${moneyStr}.`;
   }
   if (item.type === "FLOR_RESOLVED") {
     return `Flor: vos ${item.playerTanto}, Rival ${item.rivalHasFlor ? item.rivalTanto : "sin flor"}. ${item.winner === "player" ? "Ganaste." : "Ganó el Rival."}`;
@@ -401,26 +407,33 @@ export function renderGame(elements, state, ui) {
   }
 
   // Balatro Chips & Mult HUD calculation
-  const playerTricks = state.round.tricks.filter((t) => t.winner === "player").length;
-  let activeChips = playerTricks * state.rules.chipsPerTrick;
+  const inShop = state.phase === "shop";
+  const playerTricks = inShop ? 0 : state.round.tricks.filter((t) => t.winner === "player").length;
+  let activeChips = inShop ? 0 : playerTricks * state.rules.chipsPerTrick;
   let activeMult = 1
-    + (state.round.envido === "won" ? state.rules.cantos.envido.addMult : 0)
-    + (state.round.flor === "won" ? state.rules.cantos.flor.addMult : 0);
+    + (!inShop && state.round.envido === "won" ? state.rules.cantos.envido.addMult : 0)
+    + (!inShop && state.round.flor === "won" ? state.rules.cantos.flor.addMult : 0);
 
   // Truco level mult
-  const trucoLvl = state.round.trucoLevel;
+  const trucoLvl = inShop ? 0 : state.round.trucoLevel;
   const trucoMultiplier = trucoLvl === 1 ? 2 : trucoLvl === 2 ? 3 : trucoLvl === 3 ? 4 : 1;
 
-  // Calculamos los efectos activos en tiempo real (jokers, mejoras, descartes)
-  const roundEffects = getRoundEffects(state);
-  for (let eIdx = 0; eIdx < roundEffects.effects.length; eIdx += 1) {
-    const eff = roundEffects.effects[eIdx];
-    if (eff.stage === "chips") {
-      if (eff.op === "add" || !eff.op) activeChips += eff.value;
-      if (eff.op === "mul") activeChips *= eff.value;
-    } else if (eff.stage === "mult") {
-      if (eff.op === "add" || !eff.op) activeMult += eff.value;
-      if (eff.op === "mul") activeMult *= eff.value;
+  // Calculamos los efectos activos en tiempo real (jokers, mejoras, descartes) solo si estamos en ronda activa
+  if (!inShop) {
+    const roundEffects = getRoundEffects(state);
+    for (let eIdx = 0; eIdx < roundEffects.effects.length; eIdx += 1) {
+      const eff = roundEffects.effects[eIdx];
+      if (eff.stage === "chips") {
+        if (eff.op === "add" || !eff.op) activeChips += eff.value;
+        if (eff.op === "mul") activeChips *= eff.value;
+      } else if (eff.stage === "mult") {
+        if (eff.op === "add" || !eff.op) activeMult += eff.value;
+        if (eff.op === "mul") activeMult *= eff.value;
+      }
+    }
+  } else {
+    if (state.tangoMult && state.tangoMult > 0) {
+      activeMult += state.tangoMult;
     }
   }
 
@@ -441,7 +454,15 @@ export function renderGame(elements, state, ui) {
     elements.tricksDisplay.textContent = `${playerTricks} / 3`;
   }
   if (elements.playerMoney) {
-    elements.playerMoney.textContent = `$${formatMoney(state.money)}`;
+    if (state.money < 0) {
+      elements.playerMoney.textContent = `-$${formatMoney(Math.abs(state.money))}`;
+      elements.playerMoney.style.color = "#ff7675";
+      elements.playerMoney.title = "En deuda. Si llegás a -$50 perdés la partida.";
+    } else {
+      elements.playerMoney.textContent = `$${formatMoney(state.money)}`;
+      elements.playerMoney.style.color = "#feca57";
+      elements.playerMoney.title = "";
+    }
   }
   if (elements.levelValue) {
     elements.levelValue.textContent = String(state.level);
@@ -506,8 +527,11 @@ export function renderGame(elements, state, ui) {
   }
   if (elements.playMode) elements.playMode.disabled = state.phase !== "playing";
   if (elements.discardMode) elements.discardMode.disabled = !discardOpen;
-  elements.next.classList.toggle("is-visible", state.phase === "roundEnded");
-  elements.next.disabled = state.phase !== "roundEnded";
+  if (elements.next) {
+    elements.next.classList.remove("is-visible");
+    elements.next.disabled = true;
+    elements.next.style.display = "none";
+  }
   elements.cantoResponse.hidden = state.phase !== "respondCanto";
   elements.cantoQuestion.textContent = state.phase === "respondCanto"
     ? `El Rival cantó ${CANTO_NAMES[state.round.pendingCanto]}.` : "";

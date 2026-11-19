@@ -138,7 +138,19 @@ function trickCounts(round, player) {
   return round.tricks.filter((trick) => trick.winner === player).length;
 }
 
+function checkDebtLimit(state, events) {
+  if (state.money <= -50 && state.phase !== "lost") {
+    state.phase = "lost";
+    events.push(event("GAME_LOST", { level: state.level, score: state.score, reason: "DEBT_LIMIT" }));
+  }
+}
+
 function finishMatch(state, events) {
+  if (state.money <= -50) {
+    state.phase = "lost";
+    events.push(event("GAME_LOST", { level: state.level, score: state.score, reason: "DEBT_LIMIT" }));
+    return;
+  }
   if (state.score >= state.levelTarget) {
     state.phase = "shop";
     state.money += 5;
@@ -443,7 +455,8 @@ function resolveRound(state, events, forcedWinner) {
       pomberitoDelta += gained * (joker.effect.value || 1);
     }
   }
-  state.money = Math.max(0, state.money + pomberitoDelta);
+  state.money = state.money + pomberitoDelta;
+  checkDebtLimit(state, events);
 
   // Jacaranda: +1$ al finalizar cada ronda, +1$ extra si cantó Vale 4 y ganó; se paga y resetea
   let jacarandaPayout = 0;
@@ -524,16 +537,19 @@ function rejectCanto(state, canto, events) {
   // Resolve the round with player as winner (activates jokers, calculates score from tricks)
   resolveRound(state, events, "player");
   // Ensure minimum reward if earned is less than rejectReward
-  const lastEvent = events[events.length - 1];
-  if (lastEvent && lastEvent.type === "ROUND_RESOLVED") {
-    if (lastEvent.earned < reward) {
-      state.score = Math.max(0, state.score + (reward - lastEvent.earned) - lossEnvido - lossFlor);
-      lastEvent.score = state.score;
+  const roundResolvedEvent = events.slice().reverse().find((e) => e.type === "ROUND_RESOLVED");
+  if (roundResolvedEvent) {
+    if (roundResolvedEvent.earned < reward) {
+      state.score = Math.max(0, state.score + (reward - roundResolvedEvent.earned) - lossEnvido - lossFlor);
+      roundResolvedEvent.score = state.score;
     }
-    lastEvent.rejectReward = reward;
-    lastEvent.lossEnvido = lossEnvido;
-    lastEvent.lossFlor = lossFlor;
-    lastEvent.rejected = canto;
+    roundResolvedEvent.rejectReward = reward;
+    roundResolvedEvent.lossEnvido = lossEnvido;
+    roundResolvedEvent.lossFlor = lossFlor;
+    roundResolvedEvent.rejected = canto;
+  }
+  if (state.score >= state.levelTarget && state.phase !== "shop") {
+    finishMatch(state, events);
   }
 }
 
@@ -736,7 +752,8 @@ function callCanto(state, action) {
       }
     } else {
       if (!next.jokers.some((j) => j.id === "comodin-envido-vago")) {
-        next.money = Math.max(0, next.money - 1);
+        next.money -= 1;
+        checkDebtLimit(next, events);
       }
     }
     events.push(event("ENVIDO_RESOLVED", { playerTanto, rivalTanto, winner: playerWins ? "player" : "rival", moneyDelta: playerWins ? 1 : -1 }));
@@ -765,7 +782,8 @@ function callCanto(state, action) {
       if (next.jokers.some((j) => j.id === "comodin-milonga")) {
         next.money += 2;
       } else {
-        next.money = Math.max(0, next.money - 1);
+        next.money -= 1;
+        checkDebtLimit(next, events);
       }
     }
     events.push(event("FLOR_RESOLVED", { playerTanto, rivalTanto, rivalHasFlor, winner: playerWins ? "player" : "rival", moneyDelta: playerWins ? 1 : -1 }));

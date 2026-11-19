@@ -16,37 +16,31 @@ export const OFFICIAL_ITEMS = [
   {
     id: "carta-brillo-cobre", name: "Brillo de cobre", kind: "cardUpgrade", rarity: "comun",
     description: "La carta marcada suma +8 fichas cuando la jugás.",
-    shortDescription: "Lorem ipsum",
     effect: { stage: "chips", op: "add", value: 8 }
   },
   {
     id: "carta-filo-reforzado", name: "Filo reforzado", kind: "cardUpgrade", rarity: "raro",
     description: "La carta marcada suma +18 fichas cuando la jugás.",
-    shortDescription: "Lorem ipsum",
     effect: { stage: "chips", op: "add", value: 18 }
   },
   {
     id: "carta-tinta-de-canto", name: "Tinta de canto", kind: "cardUpgrade", rarity: "pocoComun",
     description: "La carta marcada suma +2 al multiplicador cuando la jugás.",
-    shortDescription: "Lorem ipsum",
     effect: { stage: "mult", op: "add", value: 2 }
   },
   {
     id: "carta-firma-de-as", name: "Firma de as", kind: "cardUpgrade", rarity: "raro",
     description: "La carta marcada suma +4 al multiplicador cuando la jugás.",
-    shortDescription: "Lorem ipsum",
     effect: { stage: "mult", op: "add", value: 4 }
   },
   {
     id: "carta-cara-acunada", name: "Cara acuñada", kind: "cardUpgrade", rarity: "pocoComun",
     description: "Ganás +$2 cada vez que jugás la carta marcada.",
-    shortDescription: "Lorem ipsum",
     effect: { stage: "money", op: "add", value: 2 }
   },
   {
     id: "carta-sello-de-oro", name: "Sello de oro", kind: "cardUpgrade", rarity: "raro",
     description: "Ganás +$4 cada vez que jugás la carta marcada.",
-    shortDescription: "Lorem ipsum",
     effect: { stage: "money", op: "add", value: 4 }
   },
   {
@@ -134,7 +128,7 @@ export const OFFICIAL_ITEMS = [
     effect: { stage: "money", op: "add", value: 5 }
   },
   {
-    id: "comodin-barajador", name: "Barajador", emoji: "🔄", kind: "joker", rarity: "comun",
+    id: "comodin-barajador", name: "Barajador", emoji: "🔄", kind: "joker", rarity: "pocoComun",
     trigger: { type: "PASSIVE_DISCARD_BONUS" },
     description: "Te otorga +2 descartes adicionales por cada ronda.",
     shortDescription: "Lorem ipsum",

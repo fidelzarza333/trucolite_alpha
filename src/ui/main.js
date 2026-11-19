@@ -2,7 +2,7 @@ import { createGame, dispatch, cantoAvailable, pickShopOffers } from "../core/ga
 import { createDeck, cardPower } from "../core/cards.js";
 import { ITEM_PRICES, itemById, FULL_CATALOG } from "../core/items.js";
 import { createDefaultRules, mergeRules, validateRules } from "../core/rules.js";
-import { formatEvent, formatMoney, renderGame, triggerToast, cardName } from "./render.js";
+import { formatEvent, formatMoney, renderGame, triggerToast, cardName, CANTO_NAMES } from "./render.js";
 import { envidoTanto } from "../core/envido.js";
 
 // Safe local storage helper for sandboxed iframes (e.g. itch.io)
@@ -263,7 +263,7 @@ const SFX = {
   ctx: null,
   buffers: {},
   isInitialized: false,
-  _masterVol: 0.55,     // global SFX volume, overridden by settings slider
+  _masterVol: 0.50,     // global SFX volume, overridden by settings slider
   sources: {
     card: ["assets/audio/SFX/card_slide.wav"],
     button: ["assets/audio/SFX/button.mp3"],
@@ -316,7 +316,7 @@ const SFX = {
   },
 
   play(type, { volume = 0.55, pitch = 1.0, pitchVariation = 0.04 } = {}) {
-    const scaledVol = volume * (this._masterVol / 0.55);
+    const scaledVol = volume * (this._masterVol / 0.50);
     const ctx = this.getContext();
     const buffer = this.buffers[type];
 
@@ -391,6 +391,22 @@ function getDelay(ms) {
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, getDelay(ms)));
 
 function startMatch({ forceNewSeed = false } = {}) {
+  // Limpieza total de estado visual y de juego previo (Fixes #10 & #16)
+  if (elements.outcomeOverlay) elements.outcomeOverlay.hidden = true;
+  if (elements.roundOutcome) elements.roundOutcome.hidden = true;
+  if (elements.deckDialog && elements.deckDialog.open) elements.deckDialog.close();
+  if (elements.shopTableView) {
+    elements.shopTableView.classList.add("is-hidden");
+    elements.shopTableView.classList.remove("fade-in");
+  }
+  if (elements.gameTableView) {
+    elements.gameTableView.classList.remove("is-hidden");
+    elements.gameTableView.classList.add("fade-in");
+  }
+  isPacing = false;
+  isCardAnimating = false;
+  BGM.setZone("main");
+
   const seedInput = document.querySelector("#seedInput");
   if (forceNewSeed && seedInput) {
     seedInput.value = ""; // Clear to force a brand new random seed!
@@ -460,7 +476,7 @@ function showOutcomeModal(type, eventData, options = {}) {
       <div class="outcome-breakdown-row"><span>Nivel alcanzado:</span><strong>Nivel ${eventData.level}</strong></div>
       <div class="outcome-breakdown-row"><span>Puntaje final acumulado:</span><strong>${eventData.score} / ${state ? state.levelTarget : 0}</strong></div>
       <div class="outcome-breakdown-row"><span>Seed de la run:</span><strong>${state ? state.seed : "-"}</strong></div>
-      <p style="margin: 8px 0 0; color: #ff7675; font-size: 12px;">Te quedaste sin rondas disponibles para alcanzar el objetivo de tantos.</p>
+      <p style="margin: 8px 0 0; color: #ff7675; font-size: 12px;">${eventData && eventData.reason === "DEBT_LIMIT" ? "Alcanzaste el límite de deuda permitido (-$50)." : "Te quedaste sin rondas disponibles para alcanzar el objetivo de tantos."}</p>
     `;
     if (continueBtn) continueBtn.hidden = true;
     if (restartBtn) {
@@ -476,7 +492,7 @@ function showOutcomeModal(type, eventData, options = {}) {
     SFX.playLose();
   } else if (type === "win") {
     badge.textContent = "RONDA GANADA";
-    title.textContent = "¡VICTORIA EN LA RONDA!";
+    title.textContent = "¡VICTORIA!";
     const tricksText = `${eventData.playerTricks || 0} a ${eventData.rivalTricks || 0}`;
     body.innerHTML = `
       <div class="outcome-breakdown-row"><span>Bazas ganadas:</span><strong>${tricksText}</strong></div>
@@ -496,7 +512,9 @@ function showOutcomeModal(type, eventData, options = {}) {
     badge.textContent = "RONDA PERDIDA";
     title.textContent = "EL RIVAL GANÓ LA RONDA";
     const remaining = state ? Math.max(0, state.rules.rounds - state.roundsCompleted) : 0;
+    const isRejected = Boolean(eventData && eventData.rejected);
     body.innerHTML = `
+      ${isRejected ? `<div class="outcome-breakdown-row"><span>Motivo:</span><strong>Canto de ${(CANTO_NAMES && CANTO_NAMES[eventData.rejected]) || eventData.rejected} no querido</strong></div>` : ""}
       <div class="outcome-breakdown-row"><span>Bazas obtenidas:</span><strong>${eventData.playerTricks || 0} de 3</strong></div>
       <div class="outcome-breakdown-row"><span>Bazas del Rival:</span><strong>${eventData.rivalTricks || 0} de 3</strong></div>
       <div class="outcome-breakdown-row"><span>Puntaje del nivel:</span><strong>${eventData.score} / ${state ? state.levelTarget : 0}</strong></div>
@@ -771,20 +789,30 @@ async function handleCantarWithPacing(action) {
         ui.tone = "win";
       } else {
         SFX.playWin();
-        notify(`${cantoUpper}: El Rival dijo NO QUIERO`, "win");
-        ui.message = `${cantoUpper}: El Rival dijo NO QUIERO. ¡Te anotás los tantos!`;
+        notify(`${cantoUpper}: ¡El Rival dijo NO QUIERO!`, "win");
+        ui.message = `¡EL RIVAL DIJO NO QUIERO! Ganás la ronda con los tantos acumulados.`;
         ui.tone = "win";
+        triggerToast(`¡El Rival NO QUISO tu ${cantoUpper}!`, "gold");
       }
       renderGame(elements, state, { ...ui, cantoAvailable });
     }
 
+    if (answeredEvt && !answeredEvt.wants) {
+      // Pausa intencional para ver la reacción del Rival antes de abrir la pantalla de victoria
+      await delay(1600);
+    }
+
     const instantCantoEvt = result.events.find((e) => e.type === "ENVIDO_RESOLVED" || e.type === "FLOR_RESOLVED");
     if (instantCantoEvt) {
-      const cantoName = instantCantoEvt.type === "ENVIDO_RESOLVED" ? "Envido" : "Flor";
-      const winnerLabel = instantCantoEvt.winner === "player" ? "¡Ganaste!" : "Ganó El Rival";
-      ui.message = `${cantoName}: ${winnerLabel} (${instantCantoEvt.playerTanto} vs ${instantCantoEvt.rivalTanto})`;
-      ui.tone = instantCantoEvt.winner === "player" ? "win" : "lose";
-      notify(`${cantoName}: ${winnerLabel} (${instantCantoEvt.playerTanto} vs ${instantCantoEvt.rivalTanto})`, instantCantoEvt.winner === "player" ? "win" : "lose");
+      const isEnvido = instantCantoEvt.type === "ENVIDO_RESOLVED";
+      const cantoName = isEnvido ? "Envido" : "Flor";
+      const isPlayerWin = instantCantoEvt.winner === "player";
+      const winnerLabel = isPlayerWin ? "¡Ganaste!" : "Ganó El Rival";
+      const moneyText = instantCantoEvt.moneyDelta > 0 ? ` (+$$${instantCantoEvt.moneyDelta})` : (instantCantoEvt.moneyDelta < 0 ? ` (-$$${Math.abs(instantCantoEvt.moneyDelta)})` : "");
+      ui.message = `${cantoName}: ${winnerLabel}${moneyText} (${instantCantoEvt.playerTanto} vs ${instantCantoEvt.rivalTanto})`;
+      ui.tone = isPlayerWin ? "gold" : "lose";
+      // Tone "gold" triggers SFX.playMoney(), tone "lose" triggers SFX.playLose()
+      notify(`${cantoName}: ${winnerLabel}${moneyText} (${instantCantoEvt.playerTanto} vs ${instantCantoEvt.rivalTanto})`, isPlayerWin ? "gold" : "lose");
       renderGame(elements, state, { ...ui, cantoAvailable });
     }
 
@@ -808,6 +836,125 @@ async function handleCantarWithPacing(action) {
   }
 }
 
+
+async function handleAnswerCantoWithPacing(action) {
+  isPacing = true;
+  elements.playerCards.inert = true;
+  elements.cardTooltip.hidden = true;
+  if (elements.cantoWant) elements.cantoWant.disabled = true;
+  if (elements.cantoReject) elements.cantoReject.disabled = true;
+
+  try {
+    const cantoName = state.round?.pendingCanto ? ((CANTO_NAMES && CANTO_NAMES[state.round.pendingCanto]) || state.round.pendingCanto) : "Canto";
+
+    if (!action.wants) {
+      SFX.playLose();
+      ui.message = `Dijiste NO QUIERO al ${cantoName}. Ronda para El Rival.`;
+      ui.tone = "lose";
+      notify(`NO QUIERO: Ronda para El Rival`, "lose");
+    } else {
+      SFX.playButton();
+      ui.message = `Dijiste ¡QUIERO! al ${cantoName}.`;
+      ui.tone = "win";
+      notify(`¡QUIERO!`, "win");
+    }
+    renderGame(elements, state, { ...ui, cantoAvailable });
+    await delay(400);
+
+    const result = dispatch(state, action);
+    const errors = result.events.filter((item) => item.type === "ERROR");
+    if (errors.length > 0) {
+      ui.events.push(...errors);
+      ui.message = formatEvent(errors[0]);
+      ui.tone = "lose";
+      notify(ui.message, "lose");
+      return;
+    }
+
+    state = result.state;
+    ui.events.push(...result.events);
+
+    const rivalPlayedEvt = result.events.find((e) => e.type === "RIVAL_PLAYED");
+    const trickResolvedEvt = result.events.find((e) => e.type === "TRICK_RESOLVED");
+    const roundResolvedEvt = result.events.find((e) => e.type === "ROUND_RESOLVED");
+    const levelWonEvt = result.events.find((e) => e.type === "LEVEL_WON");
+    const gameLostEvt = result.events.find((e) => e.type === "GAME_LOST");
+
+    // If rival played a card in response to Quiero
+    if (rivalPlayedEvt) {
+      SFX.playCard();
+      ui.message = `El Rival responde con ${cardName(rivalPlayedEvt.card)}.`;
+      renderGame(elements, state, { ...ui, cantoAvailable });
+      await delay(500);
+    }
+
+    // If trick resolved
+    if (trickResolvedEvt) {
+      if (trickResolvedEvt.winner === "player") {
+        ui.message = "¡Tu baza!";
+        ui.tone = "win";
+      } else if (trickResolvedEvt.winner === "rival") {
+        ui.message = "Baza para El Rival.";
+        ui.tone = "lose";
+      } else {
+        ui.message = "Baza parda (empate).";
+        ui.tone = "";
+      }
+      renderGame(elements, state, { ...ui, cantoAvailable });
+      await delay(550);
+    }
+
+    // Round resolution
+    if (roundResolvedEvt) {
+      await delay(400);
+      if (levelWonEvt) {
+        ui.message = `¡NIVEL ${levelWonEvt.level} SUPERADO! Meta alcanzada.`;
+        ui.tone = "win";
+        BGM.setZone("reverb");
+        renderGame(elements, state, { ...ui, cantoAvailable });
+        await delay(400);
+        showOutcomeModal("levelwon", { ...roundResolvedEvt, ...levelWonEvt });
+      } else if (gameLostEvt || state.phase === "lost") {
+        ui.message = `Run terminada en el nivel ${gameLostEvt?.level || state.level}.`;
+        ui.tone = "lose";
+        BGM.setZone("muted");
+        renderGame(elements, state, { ...ui, cantoAvailable });
+        await delay(400);
+        showOutcomeModal("gameover", gameLostEvt || { level: state.level, score: state.score });
+      } else if (roundResolvedEvt.winner === "player") {
+        ui.message = `¡Ronda ganada! +${roundResolvedEvt.earned} tantos.`;
+        ui.tone = "win";
+        renderGame(elements, state, { ...ui, cantoAvailable });
+        await delay(400);
+        showOutcomeModal("win", roundResolvedEvt);
+      } else {
+        ui.message = "Ronda perdida ante El Rival.";
+        ui.tone = "lose";
+        renderGame(elements, state, { ...ui, cantoAvailable });
+        await delay(400);
+        showOutcomeModal("lose", roundResolvedEvt);
+      }
+      return;
+    }
+
+    // If round did not end, rival may lead next trick
+    const rivalNextLeadEvt = result.events.find((e) => e.type === "RIVAL_PLAYED" && e.leader);
+    if (rivalNextLeadEvt) {
+      await delay(450);
+      SFX.playCard();
+      ui.message = `El Rival abre con ${cardName(rivalNextLeadEvt.card)}.`;
+      ui.tone = "";
+      renderGame(elements, state, { ...ui, cantoAvailable });
+      return;
+    }
+  } finally {
+    isPacing = false;
+    elements.playerCards.inert = false;
+    renderGame(elements, state, { ...ui, cantoAvailable });
+    renderJokerCollection();
+  }
+}
+
 async function applyAction(action) {
   if (!state || isCardAnimating || isPacing) return;
   elements.cardTooltip.hidden = true;
@@ -819,6 +966,11 @@ async function applyAction(action) {
 
   if (action.type === "CANTAR") {
     await handleCantarWithPacing(action);
+    return;
+  }
+
+  if (action.type === "ANSWER_CANTO") {
+    await handleAnswerCantoWithPacing(action);
     return;
   }
 
@@ -849,7 +1001,9 @@ async function applyAction(action) {
           notify("Ronda perdida ante El Rival", "lose");
         }
       } else if (lastEvent.type === "ENVIDO_RESOLVED") {
-        notify(`Envido: ${lastEvent.winner === "player" ? "¡Ganaste!" : "Ganó El Rival"} (${lastEvent.playerTanto} vs ${lastEvent.rivalTanto})`, lastEvent.winner === "player" ? "win" : "lose");
+        const isPlayerWin = lastEvent.winner === "player";
+        const moneyText = lastEvent.moneyDelta > 0 ? ` (+$$${lastEvent.moneyDelta})` : (lastEvent.moneyDelta < 0 ? ` (-$$${Math.abs(lastEvent.moneyDelta)})` : "");
+        notify(`Envido: ${isPlayerWin ? "¡Ganaste!" : "Ganó El Rival"}${moneyText} (${lastEvent.playerTanto} vs ${lastEvent.rivalTanto})`, isPlayerWin ? "gold" : "lose");
       } else if (lastEvent.type === "CANTO_ANSWERED" && lastEvent.caller !== "rival") {
         notify(`${lastEvent.canto.toUpperCase()}: El Rival dijo ${lastEvent.wants ? "¡QUIERO!" : "NO QUIERO"}`, lastEvent.wants ? "win" : "info");
       }
@@ -859,20 +1013,29 @@ async function applyAction(action) {
       SFX.playCard();
     }
     if (action.type === "BUY_ITEM") {
-      SFX.playCard();
+      SFX.playMoney();
     }
     if (action.type === "SELL_JOKER") {
       SFX.playMoney();
     }
     if (state.phase !== "playing") ui.selectedIds.clear();
 
-    // BGM Zone Transitions
-    if (lastEvent) {
-      if (lastEvent.type === "GAME_LOST") {
-        BGM.setZone("muted");
-      } else if (lastEvent.type === "LEVEL_WON") {
-        BGM.setZone("reverb");
-      } else if (lastEvent.type === "NEXT_LEVEL" || action.type === "NEXT_LEVEL") {
+    // Safety Fallback for Outcome Modal:
+    // Ensures NO round or game resolution can ever be missed, regardless of how action was dispatched
+    const roundResolvedEvt = result.events.find((e) => e.type === "ROUND_RESOLVED");
+    const levelWonEvt = result.events.find((e) => e.type === "LEVEL_WON");
+    const gameLostEvt = result.events.find((e) => e.type === "GAME_LOST");
+
+    if (levelWonEvt) {
+      BGM.setZone("reverb");
+      showOutcomeModal("levelwon", { ...roundResolvedEvt, ...levelWonEvt });
+    } else if (gameLostEvt || state.phase === "lost") {
+      BGM.setZone("muted");
+      showOutcomeModal("gameover", gameLostEvt || { level: state.level, score: state.score });
+    } else if (roundResolvedEvt) {
+      showOutcomeModal(roundResolvedEvt.winner === "player" ? "win" : "lose", roundResolvedEvt);
+    } else if (lastEvent) {
+      if (lastEvent.type === "NEXT_LEVEL" || action.type === "NEXT_LEVEL") {
         BGM.setZone("main");
       } else if (lastEvent.type === "GAME_WON") {
         BGM.setZone("reverb");
@@ -889,8 +1052,9 @@ function renderJokerCollection() {
   elements.jokerCount.textContent = `${state.jokers.length} / 5 SLOTS`;
   elements.jokerList.replaceChildren();
 
-  // Exactly 5 vertical slots in Balatro style with external action controls below
-  for (let slotIndex = 0; slotIndex < 5; slotIndex += 1) {
+  const maxSlots = state.jokers.some((j) => j.id === "comodin-triqui-traka") ? 7 : 5;
+  elements.jokerCount.textContent = `${state.jokers.length} / ${maxSlots} SLOTS`;
+  for (let slotIndex = 0; slotIndex < maxSlots; slotIndex += 1) {
     const joker = state.jokers[slotIndex];
     const slotWrapper = document.createElement("div");
     slotWrapper.className = "joker-slot-unit";
@@ -1032,7 +1196,15 @@ function renderShop() {
   }
 
   if (elements.shopLevel) elements.shopLevel.textContent = String(state.level);
-  if (elements.shopMoney) elements.shopMoney.textContent = `$${formatMoney(state.money)}`;
+  if (elements.shopMoney) {
+    if (state.money < 0) {
+      elements.shopMoney.textContent = `-$${formatMoney(Math.abs(state.money))}`;
+      elements.shopMoney.style.color = "#ff7675";
+    } else {
+      elements.shopMoney.textContent = `$${formatMoney(state.money)}`;
+      elements.shopMoney.style.color = "#feca57";
+    }
+  }
   if (elements.shopReroll) {
     elements.shopReroll.disabled = state.money < 5;
   }
@@ -1220,16 +1392,29 @@ function renderShop() {
 }
 
 function showCardTooltip(button) {
-  const lines = button.dataset.cardTooltip.split("\n");
+  const lines = (button.dataset.cardTooltip || "").split("\n").filter(Boolean);
   elements.cardTooltip.replaceChildren();
+  const label = button.getAttribute("aria-label") || "";
   const title = document.createElement("strong");
-  title.textContent = button.getAttribute("aria-label").split(". ")[0];
+  title.textContent = label.split(". ")[0];
   elements.cardTooltip.append(title);
-  for (const line of lines) {
+  const isJoker = Boolean(button.dataset.jokerId || button.classList?.contains("joker-card"));
+  lines.forEach((line, idx) => {
     const detail = document.createElement("p");
-    detail.textContent = line;
+    if (line.startsWith("Fuerza de baza:")) {
+      detail.style.color = "#feca57";
+      detail.style.fontWeight = "700";
+      detail.textContent = line;
+    } else if (isJoker && idx === 1) {
+      detail.style.color = "#94a3b8";
+      detail.style.fontStyle = "italic";
+      const clean = line.trim().replace(/^"+|"+$/g, "");
+      detail.textContent = `"${clean}"`;
+    } else {
+      detail.textContent = line;
+    }
     elements.cardTooltip.append(detail);
-  }
+  });
   elements.cardTooltip.hidden = false;
   const cardRect = button.getBoundingClientRect();
   const tooltipRect = elements.cardTooltip.getBoundingClientRect();
@@ -1245,7 +1430,7 @@ function showCardTooltip(button) {
 
 async function playSelectedCard() {
   const id = Array.from(ui.selectedIds)[0];
-  if (!id || !state || ui.mode !== "play" || isCardAnimating || isPacing) return;
+  if (!id || !state || ui.mode !== "play" || isCardAnimating || isPacing || state.phase !== "playing") return;
   const cardButton = Array.from(elements.playerCards.querySelectorAll("[data-card-id]"))
     .find((button) => button.dataset.cardId === id);
   const targetSlot = elements.trickRow.querySelector(`.trick-slot:nth-child(${state.round.tricks.length + 1})`);
@@ -1290,7 +1475,8 @@ async function playSelectedCard() {
 }
 
 function updateSelection(button) {
-  if (isPacing || !state || state.phase !== "playing") return;
+  const allowed = state && (state.phase === "playing" || state.phase === "respondCanto");
+  if (isPacing || !allowed) return;
   SFX.playCard();
   const id = button.dataset.cardId;
   if (ui.selectedIds.has(id)) {
@@ -1302,8 +1488,9 @@ function updateSelection(button) {
   button.setAttribute("aria-pressed", String(ui.selectedIds.has(id)));
 
   const count = ui.selectedIds.size;
-  const discardOpen = state.round.playerPlayedCount === 0 && state.discardsRemaining > 0;
-  const isTurn = state.round.table.rivalCard !== null || state.round.leader === "player";
+  const isPlaying = state && state.phase === "playing";
+  const discardOpen = isPlaying && state.round.playerPlayedCount === 0 && state.discardsRemaining > 0;
+  const isTurn = isPlaying && (state.round.table.rivalCard !== null || state.round.leader === "player");
 
   if (elements.action) {
     elements.action.disabled = count !== 1 || !isTurn;
@@ -1430,7 +1617,7 @@ function renderDeckViewer(sortMode) {
         }
         elements.deckDialog.close();
         applyAction({ type: "BUY_ITEM", itemId: itemToApply.id, cardId: card.id });
-        triggerToast(`¡"${itemToApply.name}" aplicada a ${cName}!`, "gold");
+        triggerToast(`¡"${itemToApply.name}" agregada a ${cName} en tu mazo!`, "gold");
       });
     }
 
@@ -1475,7 +1662,7 @@ elements.action.addEventListener("click", () => {
 });
 if (elements.discardButton) {
   elements.discardButton.addEventListener("click", () => {
-    if (ui.selectedIds.size > 0) {
+    if (state && state.phase === "playing" && ui.selectedIds.size > 0) {
       applyAction({ type: "DISCARD", ids: Array.from(ui.selectedIds) });
     }
   });
@@ -1514,7 +1701,8 @@ elements.discardMode.addEventListener("click", () => {
 });
 elements.playerCards.addEventListener("click", (event) => {
   const button = event.target.closest("[data-card-id]");
-  if (!button || !state || state.phase !== "playing") return;
+  const allowed = state && (state.phase === "playing" || state.phase === "respondCanto");
+  if (!button || !allowed) return;
   updateSelection(button);
 });
 
@@ -1572,6 +1760,10 @@ if (elements.outcomeContinue) {
     const nextAction = elements.outcomeOverlay?.dataset.nextAction;
     if (nextAction === "shop") {
       SFX.playMoney();
+      isPacing = false;
+      isCardAnimating = false;
+      renderJokerCollection();
+      renderGame(elements, state, { ...ui, cantoAvailable });
       renderShop();
       BGM.setZone("reverb");
     } else if (nextAction === "nextRound") {
@@ -1823,8 +2015,14 @@ function fadeAudio(audio, targetVolume, durationMs, onComplete) {
 // ========================================================
 
 const BGM = (() => {
-  const MUSIC_VOL = 0.35; // base music volume (lowered decibels by default)
-  const playlist = ["assets/audio/main.mp3", "assets/audio/main2.mp3", "assets/audio/main3.mp3"];
+  const MUSIC_VOL = 0.50; // base music volume (50% default)
+  const playlist = [
+    "assets/audio/beginners-luck.mp3",
+    "assets/audio/card-and-mind.mp3",
+    "assets/audio/pixels-pixels-pixels.mp3",
+    "assets/audio/thinking-outside-the-box.mp3",
+    "assets/audio/till-infinity.mp3"
+  ];
   let trackIndex = 0;
   let el = null;
   let isRunning = false;
@@ -1851,6 +2049,7 @@ const BGM = (() => {
   function playTrack(idx) {
     if (!el || !isRunning || isUserPaused) return;
     trackIndex = ((idx % playlist.length) + playlist.length) % playlist.length;
+    updateTitle();
     const nextSrc = playlist[trackIndex];
     if (el.src !== nextSrc && !el.src.endsWith(nextSrc)) {
       el.src = nextSrc;
@@ -1888,6 +2087,7 @@ const BGM = (() => {
     el.preload = "auto";
     el.volume = 0;
     el.dataset.bgmLayer = "main";
+    updateTitle();
 
     // Advance seamlessly when each track finishes
     el.addEventListener("ended", () => {
@@ -1915,6 +2115,7 @@ const BGM = (() => {
     isUserPaused = false;
     isRunning = true;
     init();
+    updateTitle();
 
     if (el.paused) {
       el.volume = 0;
@@ -1997,8 +2198,40 @@ const BGM = (() => {
     }
   }, 2500);
 
-  return { init, start, stop, pause, resume, toggle, playTrack, setZone, setVolume, getActiveRole: () => "main", getEl: () => el };
+  const trackNames = [
+    "🎵 Beginner's Luck",
+    "🎵 Card & Mind",
+    "🎵 Pixels Pixels Pixels",
+    "🎵 Thinking outside the box or Boxes outside of thinking",
+    "🎵 Till Infinity"
+  ];
+  function updateTitle() {
+    const titleEl = document.getElementById("bgmTrackTitle");
+    if (titleEl) titleEl.textContent = trackNames[trackIndex] || `🎵 Pista ${trackIndex + 1}`;
+  }
+  function nextTrack() {
+    playTrack(trackIndex + 1);
+    updateTitle();
+  }
+  function prevTrack() {
+    playTrack(trackIndex - 1);
+    updateTitle();
+  }
+
+  return { init, start, stop, pause, resume, toggle, playTrack, nextTrack, prevTrack, updateTitle, setZone, setVolume, getActiveRole: () => "main", getEl: () => el };
 })();
+
+BGM.updateTitle();
+
+// Wire up playlist navigation buttons (Checkbox 15)
+document.getElementById("bgmPrevBtn")?.addEventListener("click", () => {
+  SFX.playButton();
+  BGM.prevTrack();
+});
+document.getElementById("bgmNextBtn")?.addEventListener("click", () => {
+  SFX.playButton();
+  BGM.nextTrack();
+});
 
 // Safe stop & fade for the intro menu audio track
 function stopMenuAudio() {
@@ -2104,8 +2337,8 @@ const tourSteps = [
   },
   {
     target: ".cantos-bar",
-    title: "5. CANTOS CRIOLLOS",
-    desc: "Cantá Envido o Flor antes de tirar tu primera carta para ganar dinero ($1) y mult. Cantá Truco para multiplicar la apuesta."
+    title: "5. CANTOS CRIOLLOS Y DINERO",
+    desc: "Cantá Envido antes de tirar tu primera carta: ¡pone dinero en juego (+$$1 si ganás, -$$1 si perdés)! Flor suma mult y dinero. Cantá Truco para multiplicar la apuesta."
   },
   {
     target: ".bottom-section",
@@ -2869,6 +3102,7 @@ initParallaxTracking();
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
           <button id="debug-force-shop" class="debug-btn" style="background: #10ac84; color: #fff;">ABRIR TIENDA (NUEVA)</button>
           <button id="debug-rival-truco" class="debug-btn-secondary">RIVAL CANTA TRUCO</button>
+          <button id="debug-open-rules" class="debug-btn-secondary" style="grid-column: span 2;">ABRIR PANEL DE REGLAS</button>
         </div>
       </div>
       <button id="debug-close-bottom" class="debug-btn-secondary" style="margin-top: 10px; width: 100%;">CERRAR PANEL DEBUG</button>
@@ -3041,6 +3275,12 @@ initParallaxTracking();
       renderGame(elements, state, { ...ui, cantoAvailable });
       closeFn();
       triggerToast("¡El Rival cantó TRUCO! Respondé Quiero o No Quiero", "lose");
+    });
+
+    // Abrir panel de reglas desde debug
+    document.getElementById("debug-open-rules")?.addEventListener("click", () => {
+      const rd = document.getElementById("rulesDialog");
+      if (rd) rd.showModal();
     });
   }
 
